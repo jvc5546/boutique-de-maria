@@ -115,7 +115,7 @@ A package's stock is its scarcest item's. Load sample products with [seed/README
 | M1 | Hosting: Astro skeleton live on the domain with HTTPS | done |
 | M2 | Sign-in: Cognito + Google, invite list, admins | done |
 | M3 | Catalog | done |
-| M3.5 | Staging account, deploy approvals, security hardening | in progress |
+| M3.5 | Staging account, deploy approvals, security hardening | done |
 | M4 | Admin | |
 | M5 | Orders | |
 | M6 | Customer catalogs | |
