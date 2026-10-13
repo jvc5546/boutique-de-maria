@@ -1,7 +1,5 @@
-# One-time bootstrap for the Boutique de María AWS account.
-# Run locally with your SSO profile (see infra/bootstrap/README.md).
-# Creates: Terraform state bucket, budget alerts, and the GitHub OIDC roles
-# that let GitHub Actions deploy without stored AWS keys.
+# Bootstrap for the production account (boutique-de-maria).
+# Apply locally: AWS_PROFILE=boutique terraform apply. See infra/modules/bootstrap/README.md.
 
 terraform {
   required_version = ">= 1.10" # needed for S3 native state locking (use_lockfile)
@@ -13,9 +11,6 @@ terraform {
     }
   }
 
-  # Step 1: leave this commented out and run `terraform apply` with local state.
-  # Step 2: uncomment, then run `terraform init -migrate-state`.
-
   backend "s3" {
     bucket       = "bdm-tfstate-239280166667"
     key          = "bootstrap/terraform.tfstate"
@@ -26,13 +21,13 @@ terraform {
 }
 
 provider "aws" {
-  region = var.region
+  region = "us-east-1"
 
   default_tags {
     tags = {
       Project   = "boutique-de-maria"
       ManagedBy = "terraform"
-      Stack     = "bootstrap"
+      Stack     = "bootstrap-prod"
     }
   }
 }

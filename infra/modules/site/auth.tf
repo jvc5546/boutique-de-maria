@@ -1,7 +1,7 @@
 # Sign-in: Cognito user pool (Lite plan) with Google as the only way in.
 #
-# Flow: site -> auth.<domain>/oauth2/authorize?identity_provider=Google
-#       -> Google -> auth.<domain>/oauth2/idpresponse
+# Flow: site -> <auth_host>/oauth2/authorize?identity_provider=Google
+#       -> Google -> <auth_host>/oauth2/idpresponse
 #       -> auth-gate Lambda (invite list) -> site /auth/callback with a code
 #       -> site swaps the code for tokens (PKCE, no client secret in the browser).
 
@@ -81,14 +81,9 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
   explicit_auth_flows                  = ["ALLOW_REFRESH_TOKEN_AUTH"]
 
-  callback_urls = [
-    "https://${var.domain}/auth/callback",
-    "http://localhost:4321/auth/callback", # npm run dev
-  ]
-  logout_urls = [
-    "https://${var.domain}/",
-    "http://localhost:4321/",
-  ]
+  # dev_origins (npm run dev on localhost) are only allowed in staging.
+  callback_urls = [for o in concat(["https://${var.site_host}"], var.dev_origins) : "${o}/auth/callback"]
+  logout_urls   = [for o in concat(["https://${var.site_host}"], var.dev_origins) : "${o}/"]
 
   # Short-lived tokens, refreshed quietly for 30 days. Each refresh runs
   # auth-gate again, so a removed distributor is out within the hour.
@@ -105,12 +100,12 @@ resource "aws_cognito_user_pool_client" "web" {
   prevent_user_existence_errors = "ENABLED"
 }
 
-# --- auth.<domain>: the sign-in pages under our own name -----------------
-# Google's consent screen then says "auth.boutiquedemariamx.com" instead of
-# an amazoncognito.com address. Free: ACM certificate plus one DNS record.
+# --- auth_host: the sign-in pages under our own name ----------------------
+# Google's screen then says "auth.boutiquedemariamx.com" instead of an
+# amazoncognito.com address. Free: ACM certificate plus one DNS record.
 
 resource "aws_acm_certificate" "auth" {
-  domain_name       = "auth.${var.domain}"
+  domain_name       = var.auth_host
   validation_method = "DNS"
 
   lifecycle {
@@ -129,7 +124,7 @@ resource "cloudflare_dns_record" "auth_cert_validation" {
   content = trimsuffix(each.value.resource_record_value, ".")
   ttl     = 60
   proxied = false
-  comment = "ACM validation for auth (Terraform: infra/prod)"
+  comment = "ACM validation for ${var.auth_host} (Terraform: ${var.env})"
 }
 
 resource "aws_acm_certificate_validation" "auth" {
@@ -142,7 +137,7 @@ resource "aws_acm_certificate_validation" "auth" {
 }
 
 resource "aws_cognito_user_pool_domain" "auth" {
-  domain                = "auth.${var.domain}"
+  domain                = var.auth_host
   user_pool_id          = aws_cognito_user_pool.main.id
   certificate_arn       = aws_acm_certificate_validation.auth.certificate_arn
   managed_login_version = 1 # classic hosted UI (Lite). We skip it anyway: straight to Google.
@@ -151,10 +146,10 @@ resource "aws_cognito_user_pool_domain" "auth" {
 # Cognito serves auth.<domain> from its own CloudFront distribution.
 resource "cloudflare_dns_record" "auth" {
   zone_id = data.cloudflare_zone.site.id
-  name    = "auth.${var.domain}"
+  name    = var.auth_host
   type    = "CNAME"
   content = aws_cognito_user_pool_domain.auth.cloudfront_distribution
   ttl     = 1
   proxied = false
-  comment = "Cognito sign-in domain (Terraform: infra/prod)"
+  comment = "Cognito sign-in domain (Terraform: ${var.env})"
 }

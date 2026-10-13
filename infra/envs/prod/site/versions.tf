@@ -1,4 +1,5 @@
-# Production root module: the live site. Deployed by GitHub Actions on merge to main.
+# Production: boutiquedemariamx.com. Deployed by GitHub Actions on merge to main,
+# after you approve the run (GitHub environment "production").
 
 terraform {
   required_version = ">= 1.10"

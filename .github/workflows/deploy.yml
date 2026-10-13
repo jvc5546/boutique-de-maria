@@ -1,6 +1,5 @@
-# main: apply infrastructure, build the site, upload it, refresh the CDN cache.
-# Terraform runs first: the site build needs its outputs (the sign-in client ID).
-# Uses the github-deploy role (trusted only for the main branch).
+# main -> production, after you approve the run in GitHub
+# (environment "production" has you as a required reviewer).
 name: deploy
 
 on:
@@ -12,77 +11,12 @@ permissions:
   id-token: write
   contents: read
 
-# Never run two deploys at once; queue them instead.
-concurrency:
-  group: deploy-prod
-  cancel-in-progress: false
-
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    # No `environment:` here on purpose: it would change the OIDC subject to
-    # ...:environment:production, which the github-deploy role doesn't trust.
-    defaults:
-      run:
-        shell: bash
-    env:
-      TF_IN_AUTOMATION: "1"
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      TF_VAR_google_client_id: ${{ vars.GOOGLE_CLIENT_ID }}
-      TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      TF_VAR_admins: ${{ vars.ADMINS }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Terraform apply (prod)
-        working-directory: infra/prod
-        run: |
-          terraform init -input=false
-          terraform apply -input=false -auto-approve
-          echo "BUCKET=$(terraform output -raw site_bucket)" >> "$GITHUB_ENV"
-          echo "DIST_ID=$(terraform output -raw distribution_id)" >> "$GITHUB_ENV"
-          echo "PUBLIC_AUTH_DOMAIN=$(terraform output -raw auth_domain)" >> "$GITHUB_ENV"
-          echo "PUBLIC_AUTH_CLIENT_ID=$(terraform output -raw auth_client_id)" >> "$GITHUB_ENV"
-
-      - name: Build site
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci && npm run build # reads PUBLIC_AUTH_* from the step above
-        working-directory: web
-
-      - name: Upload site
-        working-directory: web/dist
-        run: |
-          # Fingerprinted assets never change: cache them for a year.
-          if [ -d _astro ]; then
-            aws s3 sync _astro "s3://$BUCKET/_astro" --delete \
-              --cache-control "public, max-age=31536000, immutable"
-          fi
-          # Everything else: browsers re-check each time; CloudFront keeps it
-          # for a day, and the invalidation below refreshes it on every deploy.
-          aws s3 sync . "s3://$BUCKET" --delete --exclude "_astro/*" \
-            --cache-control "public, max-age=0, s-maxage=86400, must-revalidate"
-
-      - name: Refresh CDN cache
-        run: |
-          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" \
-            --query 'Invalidation.Id' --output text
-
-      - name: Smoke test
-        run: |
-          sleep 20
-          curl -fsS https://boutiquedemariamx.com/ | grep -q "Boutique de María"
-          curl -fsS -o /dev/null https://boutiquedemariamx.com/auth/callback
-          echo "Site is up."
+  production:
+    uses: ./.github/workflows/deploy-env.yml
+    with:
+      environment: production
+      tf_dir: infra/envs/prod/site
+      site_url: https://boutiquedemariamx.com
+      role_arn: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+    secrets: inherit
