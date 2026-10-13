@@ -25,11 +25,16 @@ resource "aws_iam_role" "api" {
   assume_role_policy   = data.aws_iam_policy_document.lambda_assume.json
 }
 
-# Read-only for now: look up the caller, list products. M4 adds writes.
+# Read and write the table (admin page), and store product photos under
+# media/ in the site bucket. Nothing else.
 data "aws_iam_policy_document" "api" {
   statement {
-    actions   = ["dynamodb:GetItem", "dynamodb:Query"]
-    resources = [aws_dynamodb_table.main.arn]
+    actions   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"]
+    resources = [aws_dynamodb_table.main.arn, "${aws_dynamodb_table.main.arn}/index/*"]
+  }
+  statement {
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.site.arn}/media/*"]
   }
   statement {
     actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
@@ -62,7 +67,8 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.main.name
+      TABLE_NAME  = aws_dynamodb_table.main.name
+      SITE_BUCKET = aws_s3_bucket.site.bucket
     }
   }
 
@@ -106,6 +112,15 @@ resource "aws_apigatewayv2_integration" "api" {
 resource "aws_apigatewayv2_route" "api" {
   for_each = toset([
     "GET /api/catalog",
+    # Admin page. The Lambda checks the caller is an admin on every call.
+    "GET /api/admin/products",
+    "POST /api/admin/products",
+    "PUT /api/admin/products/{id}",
+    "POST /api/admin/products/{id}/photo",
+    "GET /api/admin/users",
+    "PUT /api/admin/users/{email}",
+    "GET /api/admin/settings",
+    "PUT /api/admin/settings",
   ])
 
   api_id             = aws_apigatewayv2_api.main.id

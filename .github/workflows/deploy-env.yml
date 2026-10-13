@@ -94,7 +94,9 @@ jobs:
           fi
           # Everything else: browsers re-check each time; CloudFront keeps it
           # for a day, and the invalidation below refreshes it on every deploy.
-          aws s3 sync . "s3://$BUCKET" --delete --exclude "_astro/*" \
+          # media/ holds product photos uploaded from the admin page: never
+          # part of the build, so --delete must not touch it.
+          aws s3 sync . "s3://$BUCKET" --delete --exclude "_astro/*" --exclude "media/*" \
             --cache-control "public, max-age=0, s-maxage=86400, must-revalidate"
 
       - name: Refresh CDN cache

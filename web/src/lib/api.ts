@@ -4,30 +4,36 @@
 
 import { clearSession, getIdToken } from './auth';
 
+/** message: the API's explanation (Spanish, ready to show) when it gave one. */
 export class ApiError extends Error {
   status: number;
-  constructor(status: number) {
-    super(`API error ${status}`);
+  constructor(status: number, message = '') {
+    super(message || `Error ${status}`);
     this.status = status;
   }
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const token = await getIdToken();
   if (!token) return leave('/');
 
+  const { json, ...rest } = init;
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (json !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(`/api${path}`, {
-    ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+    ...rest,
+    headers: { ...(rest.headers as Record<string, string>), ...headers },
+    body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
 
+  const body = await res.json().catch(() => ({}));
   if (res.status === 401) {
-    const body = await res.json().catch(() => ({}));
+    if (body.error === 'solo-admin') throw new ApiError(401, 'Esta sección es solo para administración.');
     clearSession();
     return leave(body.error === 'no-invitado' ? '/?motivo=no-invitado' : '/');
   }
-  if (!res.ok) throw new ApiError(res.status);
-  return res.json();
+  if (!res.ok) throw new ApiError(res.status, typeof body.error === 'string' ? body.error : '');
+  return body as T;
 }
 
 function leave(to: string): Promise<never> {
@@ -45,6 +51,7 @@ export interface Product {
   name: string;
   description: string;
   scent: string;
+  photo: string; // "/media/products/..." or ""
   price: number; // cents, MXN
   prices?: { standard: number; preferred: number }; // admins only
   availability: 'in' | 'low' | 'out';
@@ -55,7 +62,42 @@ export interface Product {
 
 export interface Catalog {
   user: { name: string; role: 'admin' | 'distributor'; tier: string };
+  settings: { ordersWhatsApp: string };
   products: Product[];
+}
+
+// --- Admin page (records as stored)
+
+export interface AdminProduct {
+  id: string;
+  kind: Kind;
+  name: string;
+  description?: string;
+  scent?: string;
+  priceStandard: number;
+  pricePreferred: number;
+  stock?: number;
+  components?: string[];
+  status: 'active' | 'archived';
+  sort?: number;
+  photo?: string;
+  outOfStockSince?: string;
+  listed?: boolean; // false when archived, or 60+ days out of stock
+}
+
+export interface AdminUser {
+  email: string;
+  name: string;
+  role: 'admin' | 'distributor';
+  tier: 'preferred' | 'standard';
+  status: 'active' | 'removed';
+}
+
+/** "120.50" or "120" -> 12050 cents; null if not a valid amount. */
+export function toCents(text: string): number | null {
+  const t = text.trim().replace(/[$,\s]/g, '');
+  if (!/^\d{1,6}(\.\d{1,2})?$/.test(t)) return null;
+  return Math.round(Number(t) * 100);
 }
 
 export function money(cents: number): string {

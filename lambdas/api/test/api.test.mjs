@@ -83,6 +83,7 @@ const db = {
   users: { 'jona@example.com': admin, 'old@example.com': { ...standard, status: 'removed' } },
   getUser: async (e) => db.users[e] ?? null,
   listProducts: async () => records,
+  getSettings: async () => ({ ordersWhatsApp: '+18147691664' }),
 };
 const handler = makeHandler(db);
 const ev = (routeKey, email) => ({ routeKey, requestContext: { authorizer: { jwt: { claims: { email } } } } });
@@ -93,6 +94,7 @@ test('GET /api/catalog for an active user', async () => {
   const body = JSON.parse(res.body);
   assert.equal(body.user.role, 'admin');
   assert.equal(body.products.length, 6);
+  assert.equal(body.settings.ordersWhatsApp, '+18147691664');
 });
 
 test('removed or unknown users get 401 (never 403: CloudFront would hide it)', async () => {
@@ -103,6 +105,17 @@ test('removed or unknown users get 401 (never 403: CloudFront would hide it)', a
 
 test('unknown route is 400', async () => {
   assert.equal((await handler(ev('GET /api/nada', 'jona@example.com'))).statusCode, 400);
+});
+
+test('items at zero for 60+ days leave the catalog; packages and restocked items stay', () => {
+  const now = Date.parse('2026-10-12T00:00:00Z');
+  const recs = [
+    P('old', { kind: 'mist', name: 'Old', scent: 'X', stock: 0, outOfStockSince: '2026-08-01T00:00:00Z' }),
+    P('recent', { kind: 'mist', name: 'Recent', scent: 'X', stock: 0, outOfStockSince: '2026-10-01T00:00:00Z' }),
+    P('pkg', { kind: 'package', name: 'Pkg', scent: 'X', components: ['old', 'recent'] }),
+  ];
+  const ids = buildCatalog(recs, standard, now).map((p) => p.id);
+  assert.deepEqual(ids.sort(), ['pkg', 'recent']);
 });
 
 test('plain() converts DynamoDB JSON', () => {

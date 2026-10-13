@@ -465,6 +465,13 @@ data "aws_iam_policy_document" "workload_boundary" {
     resources = [local.table_arns, "${local.table_arns}/index/*"]
   }
 
+  # Product photos uploaded from the admin page (M4).
+  statement {
+    sid       = "ProductPhotos"
+    actions   = ["s3:PutObject"]
+    resources = ["arn:aws:s3:::bdm-site-*/media/*"]
+  }
+
   statement {
     sid       = "OwnLogs"
     actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
