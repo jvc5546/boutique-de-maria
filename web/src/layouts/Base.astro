@@ -1,0 +1,42 @@
+---
+import '../styles/global.css';
+import { AUTH_DOMAIN } from '../lib/auth';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Boutique de María' } = Astro.props;
+
+// Strict CSP, production only: the dev server injects inline scripts.
+const csp = [
+  "default-src 'self'",
+  "img-src 'self' data:",
+  "style-src 'self'",
+  "script-src 'self'",
+  "font-src 'self'",
+  // The browser swaps sign-in codes for tokens directly with Cognito.
+  `connect-src 'self' https://${AUTH_DOMAIN}`,
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  'upgrade-insecure-requests',
+].join('; ');
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {import.meta.env.PROD && <meta http-equiv="Content-Security-Policy" content={csp} />}
+    <!-- Private site: keep it out of search engines -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#5b2a57" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

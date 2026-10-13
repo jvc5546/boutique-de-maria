@@ -1,0 +1,4 @@
+# Optional overrides: copy to terraform.tfvars (git-ignored) if you need to change a default.
+# expected_account_id = "239280166667"   # already the default
+alert_email = "you@example.com"
+# monthly_budget_usd = 5

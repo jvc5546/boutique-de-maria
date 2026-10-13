@@ -1,0 +1,430 @@
+{
+ "bdm-main": [
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "vainilla-bruma"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "vainilla-bruma"
+     },
+     "kind": {
+      "S": "mist"
+     },
+     "name": {
+      "S": "Bruma corporal Vainilla"
+     },
+     "description": {
+      "S": "Bruma ligera de vainilla cálida para cuerpo y cabello. 250 ml."
+     },
+     "scent": {
+      "S": "Vainilla"
+     },
+     "priceStandard": {
+      "N": "12000"
+     },
+     "pricePreferred": {
+      "N": "10000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "1"
+     },
+     "stock": {
+      "N": "12"
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "vainilla-locion"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "vainilla-locion"
+     },
+     "kind": {
+      "S": "lotion"
+     },
+     "name": {
+      "S": "Loción corporal Vainilla"
+     },
+     "description": {
+      "S": "Loción hidratante de absorción rápida con aroma a vainilla. 250 ml."
+     },
+     "scent": {
+      "S": "Vainilla"
+     },
+     "priceStandard": {
+      "N": "12000"
+     },
+     "pricePreferred": {
+      "N": "10000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "2"
+     },
+     "stock": {
+      "N": "8"
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "vainilla-paquete"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "vainilla-paquete"
+     },
+     "kind": {
+      "S": "package"
+     },
+     "name": {
+      "S": "Paquete Vainilla"
+     },
+     "description": {
+      "S": "Bruma y loción de vainilla juntas, a mejor precio."
+     },
+     "scent": {
+      "S": "Vainilla"
+     },
+     "priceStandard": {
+      "N": "20000"
+     },
+     "pricePreferred": {
+      "N": "17000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "3"
+     },
+     "components": {
+      "L": [
+       {
+        "S": "vainilla-bruma"
+       },
+       {
+        "S": "vainilla-locion"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "coco-bruma"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "coco-bruma"
+     },
+     "kind": {
+      "S": "mist"
+     },
+     "name": {
+      "S": "Bruma corporal Coco"
+     },
+     "description": {
+      "S": "Bruma fresca de coco y vainilla suave. 250 ml."
+     },
+     "scent": {
+      "S": "Coco"
+     },
+     "priceStandard": {
+      "N": "12000"
+     },
+     "pricePreferred": {
+      "N": "10000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "1"
+     },
+     "stock": {
+      "N": "5"
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "coco-locion"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "coco-locion"
+     },
+     "kind": {
+      "S": "lotion"
+     },
+     "name": {
+      "S": "Loción corporal Coco"
+     },
+     "description": {
+      "S": "Loción hidratante con aroma a coco. 250 ml."
+     },
+     "scent": {
+      "S": "Coco"
+     },
+     "priceStandard": {
+      "N": "12000"
+     },
+     "pricePreferred": {
+      "N": "10000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "2"
+     },
+     "stock": {
+      "N": "0"
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "coco-paquete"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "coco-paquete"
+     },
+     "kind": {
+      "S": "package"
+     },
+     "name": {
+      "S": "Paquete Coco"
+     },
+     "description": {
+      "S": "Bruma y loción de coco juntas, a mejor precio."
+     },
+     "scent": {
+      "S": "Coco"
+     },
+     "priceStandard": {
+      "N": "20000"
+     },
+     "pricePreferred": {
+      "N": "17000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "3"
+     },
+     "components": {
+      "L": [
+       {
+        "S": "coco-bruma"
+       },
+       {
+        "S": "coco-locion"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "frutos-rojos-bruma"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "frutos-rojos-bruma"
+     },
+     "kind": {
+      "S": "mist"
+     },
+     "name": {
+      "S": "Bruma corporal Frutos Rojos"
+     },
+     "description": {
+      "S": "Bruma dulce de fresa, frambuesa y mora. 250 ml."
+     },
+     "scent": {
+      "S": "Frutos Rojos"
+     },
+     "priceStandard": {
+      "N": "13000"
+     },
+     "pricePreferred": {
+      "N": "11000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "1"
+     },
+     "stock": {
+      "N": "3"
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "frutos-rojos-locion"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "frutos-rojos-locion"
+     },
+     "kind": {
+      "S": "lotion"
+     },
+     "name": {
+      "S": "Loción corporal Frutos Rojos"
+     },
+     "description": {
+      "S": "Loción hidratante con aroma a frutos rojos. 250 ml."
+     },
+     "scent": {
+      "S": "Frutos Rojos"
+     },
+     "priceStandard": {
+      "N": "13000"
+     },
+     "pricePreferred": {
+      "N": "11000"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "2"
+     },
+     "stock": {
+      "N": "10"
+     }
+    }
+   }
+  },
+  {
+   "PutRequest": {
+    "Item": {
+     "pk": {
+      "S": "PRODUCT"
+     },
+     "sk": {
+      "S": "frutos-rojos-paquete"
+     },
+     "type": {
+      "S": "product"
+     },
+     "id": {
+      "S": "frutos-rojos-paquete"
+     },
+     "kind": {
+      "S": "package"
+     },
+     "name": {
+      "S": "Paquete Frutos Rojos"
+     },
+     "description": {
+      "S": "Bruma y loción de frutos rojos juntas, a mejor precio."
+     },
+     "scent": {
+      "S": "Frutos Rojos"
+     },
+     "priceStandard": {
+      "N": "22000"
+     },
+     "pricePreferred": {
+      "N": "18500"
+     },
+     "status": {
+      "S": "active"
+     },
+     "sort": {
+      "N": "3"
+     },
+     "components": {
+      "L": [
+       {
+        "S": "frutos-rojos-bruma"
+       },
+       {
+        "S": "frutos-rojos-locion"
+       }
+      ]
+     }
+    }
+   }
+  }
+ ]
+}

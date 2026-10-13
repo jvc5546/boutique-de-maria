@@ -1,0 +1,22 @@
+---
+// Google -> Cognito -> here, with ?code=... (or ?error=... if the invite list said no).
+import Base from '../../layouts/Base.astro';
+---
+
+<Base title="Entrando… · Boutique de María">
+  <main class="hero">
+    <div class="mark spin" aria-hidden="true">M</div>
+    <p class="lead">Entrando…</p>
+  </main>
+</Base>
+
+<script>
+  import { handleCallback, AuthError } from '../../lib/auth';
+
+  handleCallback()
+    .then((next) => location.replace(next))
+    .catch((e) => {
+      const reason = e instanceof AuthError && e.reason === 'not-invited' ? 'no-invitado' : 'error';
+      location.replace(`/?motivo=${reason}`);
+    });
+</script>

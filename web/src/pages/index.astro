@@ -1,0 +1,67 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Boutique de María">
+  <main class="hero">
+    <div class="mark" aria-hidden="true">M</div>
+    <p class="kicker">Brumas y lociones</p>
+    <h1>Boutique de María</h1>
+    <p class="lead">Espacio privado para nuestras distribuidoras y distribuidores.</p>
+
+    <p class="notice" id="notice" role="status" hidden></p>
+
+    <button class="btn btn-google" id="signin" type="button">
+      <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+        <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/>
+        <path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/>
+        <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/>
+      </svg>
+      Entrar con Google
+    </button>
+  </main>
+  <footer class="foot">Sitio privado · solo por invitación · <a href="/privacidad">Aviso de privacidad</a></footer>
+</Base>
+
+<script>
+  import { getUser, signIn, AuthError } from '../lib/auth';
+
+  const notice = document.getElementById('notice')!;
+  const button = document.getElementById('signin') as HTMLButtonElement;
+
+  const messages: Record<string, string> = {
+    'no-invitado':
+      'Esta cuenta de Google no está en nuestra lista de invitados. Si crees que es un error, avísanos y te agregamos.',
+    error: 'No pudimos iniciar tu sesión. Intenta de nuevo en un momento.',
+    salir: 'Cerraste tu sesión. ¡Hasta pronto!',
+  };
+
+  function show(key: string) {
+    notice.textContent = messages[key] ?? '';
+    notice.hidden = !messages[key];
+    notice.dataset.kind = key === 'salir' ? 'ok' : 'warn';
+  }
+
+  const reason = new URLSearchParams(location.search).get('motivo');
+  if (reason) show(reason);
+
+  // Already signed in? Go straight in.
+  getUser()
+    .then((user) => {
+      if (user) location.replace('/inicio');
+    })
+    .catch((e) => {
+      if (e instanceof AuthError && e.reason === 'not-invited') show('no-invitado');
+    });
+
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      await signIn();
+    } catch {
+      show('error');
+      button.disabled = false;
+    }
+  });
+</script>

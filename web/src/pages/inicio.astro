@@ -1,0 +1,154 @@
+---
+// The catalog: what a signed-in distributor (or admin) sees first.
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Catálogo · Boutique de María">
+  <header class="bar">
+    <a class="brand" href="/inicio">Boutique de María</a>
+    <div class="who">
+      <span id="who-name"></span>
+      <span class="badge small" id="who-badge"></span>
+      <button class="link" id="signout" type="button">Salir</button>
+    </div>
+  </header>
+
+  <main class="catalog">
+    <div class="catalog-head">
+      <h1>Catálogo</h1>
+      <nav class="chips" id="filters" aria-label="Filtrar por tipo">
+        <button type="button" data-kind="" aria-pressed="true">Todo</button>
+        <button type="button" data-kind="mist" aria-pressed="false">Brumas</button>
+        <button type="button" data-kind="lotion" aria-pressed="false">Lociones</button>
+        <button type="button" data-kind="package" aria-pressed="false">Paquetes</button>
+      </nav>
+    </div>
+
+    <p class="status" id="status" role="status">Cargando catálogo…</p>
+    <div id="groups"></div>
+  </main>
+</Base>
+
+<script>
+  import { requireUser, signOut } from '../lib/auth';
+  import { api, money, type Catalog, type Product } from '../lib/api';
+
+  const KIND: Record<string, string> = { mist: 'Bruma', lotion: 'Loción', package: 'Paquete' };
+  const status = document.getElementById('status')!;
+  const groups = document.getElementById('groups')!;
+  let products: Product[] = [];
+  let isAdmin = false;
+
+  document.getElementById('signout')!.addEventListener('click', signOut);
+
+  // Tiny element builder: text always goes in as text, never as HTML.
+  function h(tag: string, cls = '', ...children: (Node | string | null)[]) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    for (const c of children) if (c !== null) el.append(c);
+    return el;
+  }
+
+  // Each scent gets its own soft color, assigned in alphabetical order so they
+  // stay distinct (peach, rose, lavender, honey, sage, sky, coral, lilac).
+  const HUES = [22, 340, 268, 42, 140, 200, 8, 300];
+  const scentHue = new Map<string, string>();
+  function hue(scent: string) {
+    return scentHue.get(scent) ?? HUES[0].toString();
+  }
+
+  function stockLabel(p: Product) {
+    if (p.availability === 'out') return 'Agotado';
+    if (p.availability === 'low') return p.stock === 1 ? '¡Última pieza!' : `¡Últimas ${p.stock} piezas!`;
+    return `${p.stock} disponibles`;
+  }
+
+  function card(p: Product) {
+    const photo = h('div', 'photo', h('span', '', p.scent || p.name));
+    photo.style.setProperty('--hue', hue(p.scent || p.name));
+
+    const price = h('p', 'price', money(p.price));
+    const adminPrices =
+      isAdmin && p.prices
+        ? h('p', 'tiers', `Estándar ${money(p.prices.standard)} · Preferente ${money(p.prices.preferred)}`)
+        : null;
+
+    const includes = p.components.length
+      ? h('p', 'includes', `Incluye: ${p.components.map((c) => c.name).join(' + ')}`)
+      : null;
+
+    let related: HTMLElement | null = null;
+    if (p.related.length) {
+      related = h('p', 'related', 'Misma fragancia: ');
+      p.related.forEach((r, i) => {
+        const a = h('a', '', r.name) as HTMLAnchorElement;
+        a.href = `#${r.id}`;
+        related!.append(a, i < p.related.length - 1 ? ' · ' : '');
+      });
+    }
+
+    const el = h(
+      'article',
+      `card ${p.availability === 'out' ? 'is-out' : ''}`,
+      photo,
+      h(
+        'div',
+        'card-body',
+        h('p', 'kind', KIND[p.kind] ?? p.kind),
+        h('h3', '', p.name),
+        p.description ? h('p', 'desc', p.description) : null,
+        includes,
+        h('div', 'buy', price, h('span', `stock ${p.availability}`, stockLabel(p))),
+        adminPrices,
+        related,
+      ),
+    );
+    el.id = p.id;
+    return el;
+  }
+
+  function render(kind: string) {
+    const shown = products.filter((p) => !kind || p.kind === kind);
+    groups.replaceChildren();
+    status.hidden = shown.length > 0;
+    if (!shown.length) status.textContent = 'No hay productos en esta sección todavía.';
+
+    const byScent = new Map<string, Product[]>();
+    for (const p of shown) byScent.set(p.scent, [...(byScent.get(p.scent) ?? []), p]);
+    for (const [scent, list] of byScent) {
+      groups.append(h('section', 'group', h('h2', '', scent || 'Otros'), h('div', 'grid', ...list.map(card))));
+    }
+  }
+
+  document.getElementById('filters')!.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('button');
+    if (!btn) return;
+    for (const b of btn.parentElement!.querySelectorAll('button')) {
+      b.setAttribute('aria-pressed', String(b === btn));
+    }
+    render(btn.dataset.kind ?? '');
+  });
+
+  async function main() {
+    await requireUser();
+    try {
+      const data = await api<Catalog>('/catalog');
+      products = data.products;
+      [...new Set(products.map((p) => p.scent || p.name))]
+        .sort((a, b) => a.localeCompare(b, 'es'))
+        .forEach((scent, i) => scentHue.set(scent, String(HUES[i % HUES.length])));
+      isAdmin = data.user.role === 'admin';
+      document.getElementById('who-name')!.textContent = data.user.name;
+      document.getElementById('who-badge')!.textContent = isAdmin
+        ? 'Administración'
+        : data.user.tier === 'preferred'
+          ? 'Preferente'
+          : 'Estándar';
+      render('');
+    } catch {
+      status.textContent = 'No pudimos cargar el catálogo. Intenta de nuevo en un momento.';
+    }
+  }
+
+  main();
+</script>

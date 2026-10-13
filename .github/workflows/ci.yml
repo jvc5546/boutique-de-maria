@@ -1,0 +1,85 @@
+# Pull requests: build the site and show what Terraform would change.
+# Uses the read-only github-plan role. Nothing is deployed.
+name: ci
+
+on:
+  pull_request:
+
+permissions:
+  id-token: write # OIDC token for AWS
+  contents: read
+
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Build site
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  lambdas:
+    name: Lambda tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # same as the Lambda runtime
+      - run: node --test lambdas/*/test/*.test.mjs
+
+  infra:
+    name: Terraform plan (prod)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash # adds -o pipefail, so a failed plan fails the job even through `tee`
+        working-directory: infra/prod
+    env:
+      TF_IN_AUTOMATION: "1"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_google_client_id: ${{ vars.GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      TF_VAR_admins: ${{ vars.ADMINS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive ../
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Plan
+        run: |
+          terraform plan -input=false -no-color -out=tfplan | tee plan.txt
+          {
+            echo "### Terraform plan (infra/prod)"
+            echo '```'
+            grep -E '^(Plan:|No changes|  # )' plan.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,29 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+.terraform.tfstate.lock.info
+
+# Node / Astro
+node_modules/
+dist/
+.astro/
+.env
+.env.*
+!.env.example
+
+# Go
+/api/bin/
+*.test
+*.out
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Lambda zips built by Terraform
+infra/prod/.build/
