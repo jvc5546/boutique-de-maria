@@ -143,10 +143,11 @@ import Base from '../layouts/Base.astro';
         <label for="u-name">Nombre</label>
         <input id="u-name" name="name" required maxlength="60" />
       </div>
-      <fieldset class="field">
+      <fieldset class="field" id="u-tier">
         <legend>Nivel</legend>
         <label class="radio"><input type="radio" name="tier" value="standard" id="u-tier-standard" checked /> Estándar</label>
         <label class="radio"><input type="radio" name="tier" value="preferred" id="u-tier-preferred" /> Preferente</label>
+        <p class="hint" id="u-tier-note" hidden>Sin acceso no ve precios. El nivel se guarda por si le devuelves el acceso.</p>
       </fieldset>
       <fieldset class="field">
         <legend>Acceso</legend>
@@ -399,9 +400,11 @@ import Base from '../layouts/Base.astro';
     $('users-status').textContent = 'Aún no hay distribuidores.';
     $('user-rows').replaceChildren(
       ...users.map((u) => {
+        // Without access the tier doesn't matter, so show only "Sin acceso".
         const tier = u.role === 'admin' ? h('span', 'pill', 'Administración')
+          : u.status !== 'active' ? h('span', 'pill muted', 'Sin acceso')
           : h('span', `pill ${u.tier === 'preferred' ? 'ok' : ''}`, u.tier === 'preferred' ? 'Preferente' : 'Estándar');
-        const access = u.status === 'active' ? null : h('span', 'pill muted', 'Sin acceso');
+        const access = null;
         let action: HTMLElement;
         if (u.role === 'admin') {
           action = h('span', 'hint', 'Se cambia en Terraform');
@@ -435,8 +438,17 @@ import Base from '../layouts/Base.astro';
     $<HTMLInputElement>('u-name').value = u?.name ?? '';
     $<HTMLInputElement>(`u-tier-${u?.tier ?? 'standard'}`).checked = true;
     $<HTMLInputElement>(`u-status-${u?.status ?? 'active'}`).checked = true;
+    syncAccess();
     $<HTMLDialogElement>('user-dialog').showModal();
   }
+
+  // Grey out the tier while "Sin acceso" is selected.
+  function syncAccess() {
+    const removed = $<HTMLInputElement>('u-status-removed').checked;
+    $('u-tier').classList.toggle('dimmed', removed);
+    $('u-tier-note').hidden = !removed;
+  }
+  for (const id of ['u-status-active', 'u-status-removed']) $(id).addEventListener('change', syncAccess);
   $('user-new').addEventListener('click', () => openUser(null));
 
   $('user-form').addEventListener('submit', async (e) => {

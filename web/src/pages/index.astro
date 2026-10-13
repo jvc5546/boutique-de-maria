@@ -25,14 +25,14 @@ import Base from '../layouts/Base.astro';
 </Base>
 
 <script>
-  import { getUser, signIn, AuthError } from '../lib/auth';
+  import { getUser, leave, signIn, takeNotice, AuthError } from '../lib/auth';
 
   const notice = document.getElementById('notice')!;
   const button = document.getElementById('signin') as HTMLButtonElement;
 
   const messages: Record<string, string> = {
     'no-invitado':
-      'Esta cuenta de Google no está en nuestra lista de invitados. Si crees que es un error, avísanos y te agregamos.',
+      'Esta cuenta de Google no está en nuestra lista de invitados. Puedes entrar con otra cuenta, o avísanos si crees que es un error.',
     error: 'No pudimos iniciar tu sesión. Intenta de nuevo en un momento.',
     salir: 'Cerraste tu sesión. ¡Hasta pronto!',
   };
@@ -43,7 +43,7 @@ import Base from '../layouts/Base.astro';
     notice.dataset.kind = key === 'salir' ? 'ok' : 'warn';
   }
 
-  const reason = new URLSearchParams(location.search).get('motivo');
+  const reason = new URLSearchParams(location.search).get('motivo') ?? takeNotice();
   if (reason) show(reason);
 
   // Already signed in? Go straight in.
@@ -52,7 +52,8 @@ import Base from '../layouts/Base.astro';
       if (user) location.replace('/inicio');
     })
     .catch((e) => {
-      if (e instanceof AuthError && e.reason === 'not-invited') show('no-invitado');
+      // Access was removed: end Cognito's session too, then come back here.
+      if (e instanceof AuthError && e.reason === 'not-invited') leave('no-invitado');
     });
 
   button.addEventListener('click', async () => {

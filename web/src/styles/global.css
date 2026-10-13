@@ -357,3 +357,5 @@ fieldset.field { border: 0; padding: 0; }
   .row > .btn, .row > .hint { grid-column: 3; grid-row: 1; }
   .grid2 { grid-template-columns: minmax(0, 1fr); }
 }
+
+.dimmed > label { opacity: 0.45; }

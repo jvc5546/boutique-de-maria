@@ -2,7 +2,7 @@
 // API Gateway rejects missing or invalid tokens; the API itself answers 401
 // "no-invitado" for people who were removed from the list.
 
-import { clearSession, getIdToken } from './auth';
+import { clearSession, getIdToken, leave } from './auth';
 
 /** message: the API's explanation (Spanish, ready to show) when it gave one. */
 export class ApiError extends Error {
@@ -15,7 +15,7 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const token = await getIdToken();
-  if (!token) return leave('/');
+  if (!token) return goTo('/');
 
   const { json, ...rest } = init;
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
@@ -29,8 +29,12 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) {
     if (body.error === 'solo-admin') throw new ApiError(401, 'Esta sección es solo para administración.');
+    if (body.error === 'no-invitado') {
+      leave('no-invitado'); // also ends Cognito's session, so another account can sign in
+      return new Promise(() => {});
+    }
     clearSession();
-    return leave(body.error === 'no-invitado' ? '/?motivo=no-invitado' : '/');
+    return goTo('/');
   }
   if (!res.ok) {
     // A 403/404 without JSON came from CloudFront or the firewall, not the API.
@@ -40,7 +44,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   return body as T;
 }
 
-function leave(to: string): Promise<never> {
+function goTo(to: string): Promise<never> {
   location.replace(to);
   return new Promise(() => {}); // the page is navigating away
 }
