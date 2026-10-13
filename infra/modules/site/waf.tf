@@ -33,6 +33,20 @@ resource "aws_wafv2_web_acl" "site" {
         managed_rule_group_statement {
           name        = rule.key
           vendor_name = "AWS"
+
+          # SizeRestrictions_BODY blocks any body over 8 KB, which would block
+          # product photo uploads (a few hundred KB). Count it instead. The
+          # real caps are API Gateway (10 MB), Lambda (6 MB) and the API's own
+          # 2 MB WebP/JPEG check. Every other rule in the group still blocks.
+          dynamic "rule_action_override" {
+            for_each = rule.key == "AWSManagedRulesCommonRuleSet" ? ["SizeRestrictions_BODY"] : []
+            content {
+              name = rule_action_override.value
+              action_to_use {
+                count {}
+              }
+            }
+          }
         }
       }
 

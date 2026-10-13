@@ -32,7 +32,11 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     clearSession();
     return leave(body.error === 'no-invitado' ? '/?motivo=no-invitado' : '/');
   }
-  if (!res.ok) throw new ApiError(res.status, typeof body.error === 'string' ? body.error : '');
+  if (!res.ok) {
+    // A 403/404 without JSON came from CloudFront or the firewall, not the API.
+    const fallback = res.status === 404 || res.status === 403 ? 'El servidor rechazó la solicitud. Intenta de nuevo o avísale a Jona.' : '';
+    throw new ApiError(res.status, typeof body.error === 'string' ? body.error : fallback);
+  }
   return body as T;
 }
 
