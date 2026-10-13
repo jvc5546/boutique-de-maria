@@ -41,8 +41,8 @@ resource "aws_cloudfront_function" "router" {
 
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
-  comment             = "Boutique de Maria"
-  aliases             = [var.domain, "www.${var.domain}"]
+  comment             = var.env == "prod" ? "Boutique de Maria" : "Boutique de Maria (${var.env})"
+  aliases             = concat([var.site_host], var.redirect_hosts)
   default_root_object = "index.html"
   http_version        = "http2and3"
   is_ipv6_enabled     = true

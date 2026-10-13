@@ -15,15 +15,10 @@ dist/
 .env.*
 !.env.example
 
-# Go
-/api/bin/
-*.test
-*.out
-
 # OS / editors
 .DS_Store
 .idea/
 .vscode/
 
 # Lambda zips built by Terraform
-infra/prod/.build/
+infra/modules/site/.build/

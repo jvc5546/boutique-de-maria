@@ -4,9 +4,9 @@
 DynamoDB's own JSON format, ready for `batch-write-item` (max 25 items per call).
 
 ```bash
-export AWS_PROFILE=boutique   # your SSO admin; the site itself only reads
+export AWS_PROFILE=boutique-staging   # or boutique for production
 aws dynamodb batch-write-item --request-items file://seed/catalog-sample.json
 ```
 
 Expected output: `{"UnprocessedItems": {}}` (empty = all written). Running it again just
-overwrites the same nine products. Remove them later from the admin page (M4).
+overwrites the same nine products.

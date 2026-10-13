@@ -2,8 +2,8 @@
 # CloudFront only accepts certificates from us-east-1.
 
 resource "aws_acm_certificate" "site" {
-  domain_name               = var.domain
-  subject_alternative_names = ["www.${var.domain}"]
+  domain_name               = var.site_host
+  subject_alternative_names = var.redirect_hosts
   validation_method         = "DNS"
 
   lifecycle {
@@ -23,7 +23,7 @@ resource "cloudflare_dns_record" "cert_validation" {
   content = trimsuffix(each.value.resource_record_value, ".")
   ttl     = 60
   proxied = false
-  comment = "ACM validation (Terraform: infra/prod)"
+  comment = "ACM validation (Terraform: ${var.env})"
 }
 
 # Waits (usually 1-5 minutes) until ACM sees the records and issues the certificate.

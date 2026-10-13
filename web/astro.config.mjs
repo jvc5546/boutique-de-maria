@@ -9,9 +9,9 @@ export default defineConfig({
   // Same for scripts: never inline small ones, so script-src 'self' holds.
   vite: {
     build: { assetsInlineLimit: 0 },
-    // npm run dev: send /api/* to the live API (you sign in with real Google).
+    // npm run dev: send /api/* to staging (localhost may only sign in there).
     server: {
-      proxy: { '/api': { target: 'https://boutiquedemariamx.com', changeOrigin: true } },
+      proxy: { '/api': { target: 'https://staging.boutiquedemariamx.com', changeOrigin: true } },
     },
   },
 });

@@ -15,12 +15,12 @@ locals {
   boundary_arn = "arn:aws:iam::${local.account_id}:policy/bdm-workload-boundary"
 }
 
-# Refuse to run against the wrong account (for example your personal-site account).
+# Refuse to run against the wrong account (for example production instead of staging).
 resource "terraform_data" "account_guard" {
   lifecycle {
     precondition {
       condition     = local.account_id == var.expected_account_id
-      error_message = "Wrong AWS account: the CLI profile points at a different account than expected_account_id. Use --profile boutique / AWS_PROFILE=boutique."
+      error_message = "Wrong AWS account: the CLI profile points at a different account than expected_account_id. Check AWS_PROFILE (boutique for prod, boutique-staging for staging)."
     }
   }
 }
@@ -183,6 +183,8 @@ data "aws_iam_policy_document" "plan_trust" {
 }
 
 resource "aws_iam_role" "github_plan" {
+  count = var.create_plan_role ? 1 : 0
+
   name                 = "github-plan"
   description          = "GitHub Actions: terraform plan on pull requests (read-only)"
   assume_role_policy   = data.aws_iam_policy_document.plan_trust.json
@@ -190,7 +192,8 @@ resource "aws_iam_role" "github_plan" {
 }
 
 resource "aws_iam_role_policy_attachment" "plan_readonly" {
-  role       = aws_iam_role.github_plan.name
+  count      = var.create_plan_role ? 1 : 0
+  role       = aws_iam_role.github_plan[0].name
   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
 
@@ -206,8 +209,9 @@ data "aws_iam_policy_document" "state_access" {
 }
 
 resource "aws_iam_role_policy" "plan_state" {
+  count  = var.create_plan_role ? 1 : 0
   name   = "terraform-state"
-  role   = aws_iam_role.github_plan.id
+  role   = aws_iam_role.github_plan[0].id
   policy = data.aws_iam_policy_document.state_access.json
 }
 
@@ -241,12 +245,16 @@ data "aws_iam_policy_document" "plan_extra_read" {
 }
 
 resource "aws_iam_role_policy" "plan_extra_read" {
+  count  = var.create_plan_role ? 1 : 0
   name   = "extra-read"
-  role   = aws_iam_role.github_plan.id
+  role   = aws_iam_role.github_plan[0].id
   policy = data.aws_iam_policy_document.plan_extra_read.json
 }
 
-# Deploy role: only the main branch can assume it.
+# Deploy role: only jobs running in the GitHub environment var.deploy_environment
+# can assume it. For "production", GitHub makes those jobs wait for your
+# approval, and removing `environment:` from a workflow changes the token's
+# subject, so AWS refuses it. The approval can't be skipped by editing code.
 # Least privilege: read everything, write only what infra/prod and the deploy
 # workflow manage. No IAM writes, so it can't grant itself more access.
 # Each milestone that adds a service (Cognito, Lambda, DynamoDB...) widens it.
@@ -265,14 +273,14 @@ data "aws_iam_policy_document" "deploy_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["${local.gh_subject}:ref:refs/heads/main"]
+      values   = ["${local.gh_subject}:environment:${var.deploy_environment}"]
     }
   }
 }
 
 resource "aws_iam_role" "github_deploy" {
   name                 = "github-deploy"
-  description          = "GitHub Actions: terraform apply and deploys from main"
+  description          = "GitHub Actions: terraform apply and deploys (environment ${var.deploy_environment})"
   assume_role_policy   = data.aws_iam_policy_document.deploy_trust.json
   max_session_duration = 3600
 }
@@ -411,6 +419,20 @@ data "aws_iam_policy_document" "deploy_prod" {
     resources = [local.role_arns]
   }
 
+  # Things that cost real money for a long time and that this site never
+  # needs. An explicit Deny wins over every Allow above.
+  statement {
+    sid    = "NoCostlyCommitments"
+    effect = "Deny"
+    actions = [
+      "lambda:PutProvisionedConcurrencyConfig",     # pay per hour for warm Lambdas
+      "dynamodb:PurchaseReservedCapacityOfferings", # 1-3 year capacity contracts
+      "dynamodb:CreateTableReplica",                # copies in other regions
+      "dynamodb:UpdateTableReplicaAutoScaling",
+    ]
+    resources = ["*"]
+  }
+
   # Hand those roles to Lambda, and only to Lambda.
   statement {
     sid       = "PassWorkloadRolesToLambda"
@@ -457,7 +479,7 @@ resource "aws_iam_policy" "workload_boundary" {
 }
 
 resource "aws_iam_role_policy" "deploy_prod" {
-  name   = "deploy-prod"
+  name   = "deploy-${var.env}"
   role   = aws_iam_role.github_deploy.id
   policy = data.aws_iam_policy_document.deploy_prod.json
 }

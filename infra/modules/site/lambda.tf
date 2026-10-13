@@ -13,7 +13,7 @@ locals {
 
 data "archive_file" "auth_gate" {
   type        = "zip"
-  source_dir  = "${path.module}/../../lambdas/auth-gate/src"
+  source_dir  = "${path.module}/../../../lambdas/auth-gate/src"
   output_path = "${path.module}/.build/auth-gate.zip"
 }
 

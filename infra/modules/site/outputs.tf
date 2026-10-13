@@ -1,5 +1,5 @@
 output "site_url" {
-  value = "https://${var.domain}"
+  value = "https://${var.site_host}"
 }
 
 output "site_bucket" {

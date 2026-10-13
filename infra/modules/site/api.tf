@@ -14,7 +14,7 @@ locals {
 
 data "archive_file" "api" {
   type        = "zip"
-  source_dir  = "${path.module}/../../lambdas/api/src"
+  source_dir  = "${path.module}/../../../lambdas/api/src"
   output_path = "${path.module}/.build/api.zip"
 }
 
@@ -79,7 +79,7 @@ resource "aws_lambda_function" "api" {
 resource "aws_apigatewayv2_api" "main" {
   name          = "bdm-api"
   protocol_type = "HTTP"
-  description   = "Boutique de Maria API, served at https://${var.domain}/api/ through CloudFront"
+  description   = "Boutique de Maria API, served at https://${var.site_host}/api/ through CloudFront"
 }
 
 # Only tokens issued by our user pool, for our web client, get through.
@@ -120,10 +120,12 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
-  # A family-sized ceiling: plenty for real use, and it caps any abuse.
+  # A family-sized ceiling: plenty for real use, and it caps the bill if
+  # someone floods the API (including its direct execute-api address, which
+  # skips CloudFront and the WAF).
   default_route_settings {
-    throttling_burst_limit = 50
-    throttling_rate_limit  = 20
+    throttling_burst_limit = var.api_burst_limit
+    throttling_rate_limit  = var.api_rate_limit
   }
 }
 
