@@ -14,13 +14,13 @@ terraform {
   # First apply: keep this commented out (the bucket doesn't exist yet).
   # Then uncomment it and run `terraform init -migrate-state`.
   #
-  # backend "s3" {
-  #   bucket       = "bdm-tfstate-788026358738"
-  #   key          = "bootstrap/terraform.tfstate"
-  #   region       = "us-east-1"
-  #   use_lockfile = true
-  #   encrypt      = true
-  # }
+  backend "s3" {
+    bucket       = "bdm-tfstate-788026358738"
+    key          = "bootstrap/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
+  }
 }
 
 provider "aws" {
