@@ -15,19 +15,12 @@ export const DEPARTMENTS = [
     scent: true,
     packages: true,
   },
-  // TEMPORARY — only to try the section tabs on staging. Remove before merging.
-  {
-    id: 'prueba',
-    name: 'Prueba',
-    kinds: { test: ['Artículo de prueba', 'Artículos de prueba'] },
-    scent: false,
-    packages: false,
-  },
 ];
 
 export const KINDS = DEPARTMENTS.flatMap((d) => Object.keys(d.kinds));
 
-/** Which section a product type belongs to ("package" -> the section that builds paquetes). */
+/** Which section a product type belongs to ("package" -> the section that builds paquetes).
+ *  A type no section claims returns '' and the product isn't shown anywhere. */
 export function departmentOf(kind) {
   if (kind === 'package') return DEPARTMENTS.find((d) => d.packages)?.id ?? '';
   return DEPARTMENTS.find((d) => kind in d.kinds)?.id ?? '';
