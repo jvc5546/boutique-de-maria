@@ -6,17 +6,28 @@
 //   stock                           (items only; packages have none of their own)
 //   components                      (packages only: item ids inside)
 //   status ("active" | "archived"), sort (number, optional)
+//   photo ("media/products/<id>-<time>.webp", optional)
+//   outOfStockSince (ISO time; set by the admin API when stock hits 0)
 //
 // Rules:
 //   - A distributor sees one price: their tier's. Admins see both.
 //   - A package is available as many times as its scarcest item allows,
 //     so it's out of stock as soon as any item inside is.
 //   - Items with the same scent are "related" (Misma fragancia).
+//   - An item at zero stock for 60 days leaves the catalog on its own
+//     (as if archived); restocking it brings it back.
 
 export const LOW_STOCK = 3;
+export const STALE_DAYS = 60;
 
-export function buildCatalog(records, user) {
-  const active = records.filter((p) => p.status === 'active');
+export function isListed(p, now = Date.now()) {
+  if (p.status !== 'active') return false;
+  if (p.kind === 'package' || (p.stock ?? 0) > 0 || !p.outOfStockSince) return true;
+  return now - Date.parse(p.outOfStockSince) < STALE_DAYS * 86_400_000;
+}
+
+export function buildCatalog(records, user, now = Date.now()) {
+  const active = records.filter((p) => isListed(p, now));
   const byId = new Map(active.map((p) => [p.id, p]));
   const isAdmin = user.role === 'admin';
 
@@ -36,6 +47,7 @@ export function buildCatalog(records, user) {
       name: p.name,
       description: p.description ?? '',
       scent: p.scent ?? '',
+      photo: p.photo ? `/${p.photo}` : '',
       price: priceFor(p, user),
       availability: stock <= 0 ? 'out' : stock <= LOW_STOCK ? 'low' : 'in',
       stock,

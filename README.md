@@ -102,10 +102,14 @@ ID token) → `bdm-api` Lambda (looks the person up in the table on every call).
 
 | Route | Returns |
 |---|---|
-| `GET /api/catalog` | Active products with the caller's tier price (admins: both prices), stock, package contents, same-scent items |
+| `GET /api/catalog` | Listed products with the caller's tier price (admins: both prices), stock, package contents, same-scent items, photo; the orders WhatsApp number |
+| `GET/POST /api/admin/products`, `PUT /api/admin/products/{id}` | Admins: every product as stored; create (id from the name) or replace one |
+| `POST /api/admin/products/{id}/photo` | Admins: a WebP/JPEG (≤ 2 MB, already squared by the browser), stored at `media/products/` in the site bucket |
+| `GET /api/admin/users`, `PUT /api/admin/users/{email}` | Admins: distributors (add, tier, access). Admin accounts stay in Terraform (`ADMINS`) |
+| `GET/PUT /api/admin/settings` | Admins: orders WhatsApp number, international format with country code |
 
 Products live in `bdm-main` under `pk = PRODUCT`, `sk = <id>`; prices are integer cents (MXN).
-A package's stock is its scarcest item's. Load sample products with [seed/README.md](seed/README.md).
+A package's stock is its scarcest item's. An item at zero stock for 60 days leaves the catalog until restocked. Load sample products with [seed/README.md](seed/README.md).
 
 ## Milestones
 
@@ -116,7 +120,7 @@ A package's stock is its scarcest item's. Load sample products with [seed/README
 | M2 | Sign-in: Cognito + Google, invite list, admins | done |
 | M3 | Catalog | done |
 | M3.5 | Staging account, deploy approvals, security hardening | done |
-| M4 | Admin | |
+| M4 | Admin | in progress |
 | M5 | Orders | |
 | M6 | Customer catalogs | |
 | M7 | Metrics | |

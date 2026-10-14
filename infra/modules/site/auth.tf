@@ -6,8 +6,11 @@
 #       -> site swaps the code for tokens (PKCE, no client secret in the browser).
 
 resource "aws_cognito_user_pool" "main" {
-  name                = "bdm-users"
-  user_pool_tier      = "LITE" # 10,000 monthly active users free
+  name = "bdm-users"
+  # Essentials: needed for managed login (v2), which forwards prompt=select_account
+  # to Google so people can switch accounts. Same permanent free tier as Lite:
+  # 10,000 monthly active users.
+  user_pool_tier      = "ESSENTIALS"
   deletion_protection = "ACTIVE"
 
   username_configuration {
@@ -140,10 +143,18 @@ resource "aws_cognito_user_pool_domain" "auth" {
   domain                = var.auth_host
   user_pool_id          = aws_cognito_user_pool.main.id
   certificate_arn       = aws_acm_certificate_validation.auth.certificate_arn
-  managed_login_version = 1 # classic hosted UI (Lite). We skip it anyway: straight to Google.
+  managed_login_version = 2 # managed login: honors prompt=select_account. We skip its pages anyway: straight to Google.
 }
 
-# Cognito serves auth.<domain> from its own CloudFront distribution.
+# Managed login needs a style for its few pages people may see (errors, sign-out).
+# AWS's default look is fine: everyone goes straight to Google.
+resource "aws_cognito_managed_login_branding" "web" {
+  user_pool_id                = aws_cognito_user_pool.main.id
+  client_id                   = aws_cognito_user_pool_client.web.id
+  use_cognito_provided_values = true
+}
+
+# Cognito serves auth_host from its own CloudFront distribution.
 resource "cloudflare_dns_record" "auth" {
   zone_id = data.cloudflare_zone.site.id
   name    = var.auth_host

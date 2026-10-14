@@ -17,6 +17,8 @@ const CLIENT_ID: string = import.meta.env.PUBLIC_AUTH_CLIENT_ID || '';
 
 const SESSION_KEY = 'bdm.session';
 const PKCE_KEY = 'bdm.pkce';
+const CHOOSE_KEY = 'bdm.chooseAccount'; // next sign-in shows Google's account chooser
+const NOTICE_KEY = 'bdm.notice'; // message for the start page after a sign-out
 const NOT_INVITED = 'NO_INVITADO'; // message thrown by the auth-gate Lambda
 
 export type Role = 'admin' | 'distributor';
@@ -66,6 +68,9 @@ export async function signIn(returnTo = '/inicio'): Promise<void> {
     code_challenge: base64url(await sha256(verifier)),
     code_challenge_method: 'S256',
   }).toString();
+  // After a sign-out or a refusal, let the person pick a different Google
+  // account instead of Google silently reusing the last one.
+  if (readFlag()) url.searchParams.set('prompt', 'select_account');
   location.assign(url.toString());
 }
 
@@ -89,6 +94,9 @@ export async function handleCallback(): Promise<string> {
     code_verifier: saved.verifier,
   });
   saveSession(tokens, tokens.refresh_token);
+  try {
+    localStorage.removeItem(CHOOSE_KEY);
+  } catch {}
   return saved.returnTo || '/inicio';
 }
 
@@ -121,6 +129,20 @@ export async function getIdToken(): Promise<string | null> {
 }
 
 export function signOut(): void {
+  leave('salir');
+}
+
+/**
+ * End the session everywhere: our tokens, the refresh token, and Cognito's own
+ * session cookie (via /logout). Without the last one, "Entrar" would silently
+ * sign the same refused account back in for up to an hour.
+ * reason is shown on the start page.
+ */
+export function leave(reason: 'salir' | 'no-invitado'): void {
+  try {
+    sessionStorage.setItem(NOTICE_KEY, reason);
+    localStorage.setItem(CHOOSE_KEY, '1');
+  } catch {}
   const session = loadSession();
   clearSession();
   if (session && isConfigured()) {
@@ -144,7 +166,8 @@ export async function requireUser(): Promise<User> {
     if (user) return user;
     location.replace('/');
   } catch (e) {
-    location.replace(e instanceof AuthError && e.reason === 'not-invited' ? '/?motivo=no-invitado' : '/');
+    if (e instanceof AuthError && e.reason === 'not-invited') leave('no-invitado');
+    else location.replace('/');
   }
   return new Promise(() => {}); // never resolves: the page is navigating away
 }
@@ -184,6 +207,25 @@ function saveSession(tokens: TokenResponse, refreshToken?: string): Session {
   };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   return session;
+}
+
+/** The start page's message after leave(), shown once. */
+export function takeNotice(): string | null {
+  try {
+    const n = sessionStorage.getItem(NOTICE_KEY);
+    sessionStorage.removeItem(NOTICE_KEY);
+    return n;
+  } catch {
+    return null;
+  }
+}
+
+function readFlag(): boolean {
+  try {
+    return localStorage.getItem(CHOOSE_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 function loadSession(): Session | null {

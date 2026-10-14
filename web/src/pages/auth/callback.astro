@@ -11,12 +11,13 @@ import Base from '../../layouts/Base.astro';
 </Base>
 
 <script>
-  import { handleCallback, AuthError } from '../../lib/auth';
+  import { handleCallback, leave, AuthError } from '../../lib/auth';
 
   handleCallback()
     .then((next) => location.replace(next))
     .catch((e) => {
-      const reason = e instanceof AuthError && e.reason === 'not-invited' ? 'no-invitado' : 'error';
-      location.replace(`/?motivo=${reason}`);
+      // Refused: end Cognito's session too, so another account can be tried.
+      if (e instanceof AuthError && e.reason === 'not-invited') leave('no-invitado');
+      else location.replace('/?motivo=error');
     });
 </script>

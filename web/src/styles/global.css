@@ -261,3 +261,101 @@ a.brand { text-decoration: none; }
   .buy { flex-direction: column; align-items: flex-start; }
   .who #who-name { display: none; }
 }
+
+/* ---- M4: product photos ---- */
+
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---- M4: admin ---- */
+
+.status.centered { text-align: center; }
+.admin section { margin-top: 18px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.toolbar input[type='search'] { flex: 1 1 260px; max-width: 420px; }
+.hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+input, select, textarea {
+  font: inherit;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid rgba(46, 21, 41, 0.2);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+}
+input[type='checkbox'], input[type='radio'] { width: auto; padding: 0; accent-color: var(--plum); }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--plum);
+  outline-offset: 2px;
+}
+textarea { resize: vertical; }
+
+.btn.ghost { background: #fff; color: var(--plum); border: 1px solid rgba(91, 42, 87, 0.3) !important; }
+.btn.small { margin: 0; padding: 6px 12px; font-size: 0.85rem; }
+.toolbar .btn, .actions .btn { margin-top: 0; }
+
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 12px 16px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 3px 12px rgba(46, 21, 41, 0.06);
+}
+.row-main { min-width: 0; }
+.row-title { margin: 0; font-weight: 700; color: var(--plum-deep); overflow-wrap: anywhere; }
+.row-sub { margin: 0; font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
+.row-prices { display: grid; font-size: 0.85rem; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.photo.thumb { width: 52px; height: 52px; aspect-ratio: auto; border-radius: 10px; overflow: hidden; background: var(--rose); }
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--rose); color: var(--plum); font-weight: 700;
+}
+
+.pill { font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--rose); color: var(--plum); white-space: nowrap; }
+.pill.ok { background: #eef7ee; color: #2d5a2d; }
+.pill.warn { background: #fff4e5; color: #7a4b00; }
+.pill.muted { background: #efeaee; color: var(--muted); }
+
+.panel { background: #fff; border-radius: 16px; padding: 18px; max-width: 34rem; display: grid; gap: 8px; box-shadow: 0 3px 12px rgba(46, 21, 41, 0.06); }
+.panel label { font-weight: 700; color: var(--plum-deep); }
+.saved { color: #2d5a2d; font-weight: 600; font-size: 0.9rem; }
+
+dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  border: 0;
+  border-radius: 18px;
+  padding: 22px;
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(46, 21, 41, 0.3);
+}
+dialog::backdrop { background: rgba(46, 21, 41, 0.45); }
+dialog h2 { margin: 0 0 14px; font: 600 1.4rem 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; color: var(--plum-deep); }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.span2 { grid-column: 1 / -1; }
+.field { display: grid; gap: 5px; margin: 0 0 12px; min-width: 0; }
+.grid2 .field { margin: 0; }
+.field > label, legend { font-size: 0.85rem; font-weight: 700; color: var(--plum-deep); }
+fieldset.field { border: 0; padding: 0; }
+.radio { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; padding: 3px 0; }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px 12px; max-height: 180px; overflow-y: auto; }
+.photo-pick { display: flex; gap: 14px; align-items: center; }
+.photo-pick .photo.thumb { width: 88px; height: 88px; flex: none; }
+.form-error { color: #9b2c2c; font-weight: 600; font-size: 0.9rem; margin: 10px 0 0; min-height: 1em; }
+.actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 14px; }
+.panel .actions { justify-content: flex-start; }
+
+@media (max-width: 720px) {
+  .row { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .row .photo.thumb, .row .avatar { width: 44px; height: 44px; }
+  .row-prices, .row-stock { grid-column: 2 / -1; text-align: left; display: flex; gap: 12px; }
+  .row > .pill { grid-column: 2; justify-self: start; }
+  .row > .btn, .row > .hint { grid-column: 3; grid-row: 1; }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+.dimmed > label { opacity: 0.45; }

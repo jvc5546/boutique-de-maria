@@ -11,7 +11,7 @@ const { title = 'Boutique de María' } = Astro.props;
 // Strict CSP, production only: the dev server injects inline scripts.
 const csp = [
   "default-src 'self'",
-  "img-src 'self' data:",
+  "img-src 'self' data: blob:", // blob: previews a photo before upload
   "style-src 'self'",
   "script-src 'self'",
   "font-src 'self'",

@@ -1,0 +1,515 @@
+---
+// Admin page: products, distributors and settings. The API checks that the
+// caller is an admin on every request; this page only hides itself otherwise.
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Administración · Boutique de María">
+  <header class="bar">
+    <a class="brand" href="/inicio">Boutique de María</a>
+    <div class="who">
+      <a class="link" href="/inicio">Catálogo</a>
+      <button class="link" id="signout" type="button">Salir</button>
+    </div>
+  </header>
+
+  <main class="catalog admin" id="main" hidden>
+    <div class="catalog-head">
+      <h1>Administración</h1>
+      <nav class="chips" id="tabs" aria-label="Secciones">
+        <button type="button" data-tab="products" aria-pressed="true">Productos</button>
+        <button type="button" data-tab="users" aria-pressed="false">Distribuidores</button>
+        <button type="button" data-tab="settings" aria-pressed="false">Ajustes</button>
+      </nav>
+    </div>
+
+    <!-- Productos -->
+    <section id="tab-products">
+      <div class="toolbar">
+        <input id="product-search" type="search" placeholder="Buscar por nombre o fragancia" aria-label="Buscar productos" />
+        <button class="btn" id="product-new" type="button">+ Nuevo producto</button>
+      </div>
+      <p class="status" id="products-status">Cargando…</p>
+      <ul class="rows" id="product-rows"></ul>
+    </section>
+
+    <!-- Distribuidores -->
+    <section id="tab-users" hidden>
+      <div class="toolbar">
+        <p class="hint">Cada persona entra con “Entrar con Google” usando el correo que registres aquí.</p>
+        <button class="btn" id="user-new" type="button">+ Agregar distribuidor</button>
+      </div>
+      <p class="status" id="users-status">Cargando…</p>
+      <ul class="rows" id="user-rows"></ul>
+    </section>
+
+    <!-- Ajustes -->
+    <section id="tab-settings" hidden>
+      <form class="panel" id="settings-form" novalidate>
+        <label for="s-whatsapp">WhatsApp para pedidos</label>
+        <input id="s-whatsapp" name="ordersWhatsApp" type="tel" inputmode="tel" autocomplete="off" placeholder="+52 55 1234 5678" />
+        <p class="hint">Con <b>+</b> y código de país (México +52, Estados Unidos +1). Los pedidos de las distribuidoras llegan a este número.</p>
+        <p class="form-error" id="settings-error" role="alert"></p>
+        <div class="actions"><button class="btn" type="submit">Guardar</button><span class="saved" id="settings-saved"></span></div>
+      </form>
+    </section>
+  </main>
+
+  <p class="status centered" id="page-status" role="status">Cargando…</p>
+
+  <!-- Product dialog -->
+  <dialog id="product-dialog" aria-labelledby="pd-title">
+    <form id="product-form" method="dialog" novalidate>
+      <h2 id="pd-title">Producto</h2>
+      <div class="grid2">
+        <div class="field span2">
+          <label for="p-name">Nombre</label>
+          <input id="p-name" name="name" required maxlength="80" />
+        </div>
+        <div class="field">
+          <label for="p-kind">Tipo</label>
+          <select id="p-kind" name="kind">
+            <option value="mist">Bruma</option>
+            <option value="lotion">Loción</option>
+            <option value="package">Paquete</option>
+            <option value="other">Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="p-scent">Fragancia</label>
+          <input id="p-scent" name="scent" maxlength="40" list="scents" />
+          <datalist id="scents"></datalist>
+        </div>
+        <div class="field span2">
+          <label for="p-description">Descripción</label>
+          <textarea id="p-description" name="description" rows="3" maxlength="400"></textarea>
+        </div>
+        <div class="field">
+          <label for="p-price-standard">Precio Estándar ($)</label>
+          <input id="p-price-standard" name="priceStandard" inputmode="decimal" placeholder="120.00" />
+        </div>
+        <div class="field">
+          <label for="p-price-preferred">Precio Preferente ($)</label>
+          <input id="p-price-preferred" name="pricePreferred" inputmode="decimal" placeholder="100.00" />
+        </div>
+        <div class="field" id="stock-field">
+          <label for="p-stock">Existencias</label>
+          <input id="p-stock" name="stock" type="number" min="0" step="1" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label for="p-sort">Orden</label>
+          <input id="p-sort" name="sort" type="number" min="0" step="1" inputmode="numeric" />
+        </div>
+        <fieldset class="field span2" id="components-field" hidden>
+          <legend>Incluye (2 o más)</legend>
+          <div class="checks" id="p-components"></div>
+          <p class="hint">Las existencias del paquete son las del producto que tenga menos.</p>
+        </fieldset>
+        <div class="field">
+          <label for="p-status">Estado</label>
+          <select id="p-status" name="status">
+            <option value="active">Activo</option>
+            <option value="archived">Archivado</option>
+          </select>
+        </div>
+        <div class="field span2">
+          <label for="p-photo">Foto</label>
+          <div class="photo-pick">
+            <div class="photo thumb" id="p-photo-preview"></div>
+            <div>
+              <input id="p-photo" type="file" accept="image/*" />
+              <p class="hint">Se recorta al centro en un cuadrado de 1200 px.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="form-error" id="product-error" role="alert"></p>
+      <div class="actions">
+        <button class="btn ghost" type="button" data-close>Cancelar</button>
+        <button class="btn" type="submit" id="product-save">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Distributor dialog -->
+  <dialog id="user-dialog" aria-labelledby="ud-title">
+    <form id="user-form" method="dialog" novalidate>
+      <h2 id="ud-title">Distribuidor</h2>
+      <div class="field">
+        <label for="u-email">Correo de Google</label>
+        <input id="u-email" name="email" type="email" required autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="u-name">Nombre</label>
+        <input id="u-name" name="name" required maxlength="60" />
+      </div>
+      <fieldset class="field" id="u-tier">
+        <legend>Nivel</legend>
+        <label class="radio"><input type="radio" name="tier" value="standard" id="u-tier-standard" checked /> Estándar</label>
+        <label class="radio"><input type="radio" name="tier" value="preferred" id="u-tier-preferred" /> Preferente</label>
+        <p class="hint" id="u-tier-note" hidden>Sin acceso no ve precios. El nivel se guarda por si le devuelves el acceso.</p>
+      </fieldset>
+      <fieldset class="field">
+        <legend>Acceso</legend>
+        <label class="radio"><input type="radio" name="status" value="active" id="u-status-active" checked /> Puede entrar</label>
+        <label class="radio"><input type="radio" name="status" value="removed" id="u-status-removed" /> Sin acceso</label>
+      </fieldset>
+      <p class="form-error" id="user-error" role="alert"></p>
+      <div class="actions">
+        <button class="btn ghost" type="button" data-close>Cancelar</button>
+        <button class="btn" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+</Base>
+
+<script>
+  import { requireUser, signOut } from '../lib/auth';
+  import { api, ApiError, money, toCents, type AdminProduct, type AdminUser, type Catalog } from '../lib/api';
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+  const KIND: Record<string, string> = { mist: 'Bruma', lotion: 'Loción', package: 'Paquete', other: 'Otro' };
+
+  function h(tag: string, cls = '', ...children: (Node | string | null)[]) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    for (const c of children) if (c !== null) el.append(c);
+    return el;
+  }
+  const errorText = (e: unknown) => (e instanceof ApiError && e.message ? e.message : 'Algo salió mal. Intenta de nuevo.');
+
+  $('signout').addEventListener('click', signOut);
+  for (const d of document.querySelectorAll('dialog')) {
+    d.querySelector('[data-close]')?.addEventListener('click', () => d.close());
+  }
+
+  // ---------------------------------------------------------------- tabs
+  $('tabs').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('button');
+    if (!btn) return;
+    for (const b of $('tabs').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === btn));
+    for (const t of ['products', 'users', 'settings']) $(`tab-${t}`).hidden = btn.dataset.tab !== t;
+  });
+
+  // ---------------------------------------------------------------- products
+  let products: AdminProduct[] = [];
+  let editing: AdminProduct | null = null;
+  let pickedPhoto: Blob | null = null;
+
+  function statusBadge(p: AdminProduct) {
+    if (p.status === 'archived') return h('span', 'pill muted', 'Archivado');
+    if (!p.listed) return h('span', 'pill warn', 'Oculto: 60+ días sin existencias');
+    return h('span', 'pill ok', 'En catálogo');
+  }
+
+  function stockOf(p: AdminProduct) {
+    if (p.kind !== 'package') return p.stock ?? 0;
+    const items = (p.components ?? []).map((id) => products.find((x) => x.id === id));
+    return items.length && items.every(Boolean) ? Math.min(...items.map((x) => x!.stock ?? 0)) : 0;
+  }
+
+  function renderProducts() {
+    const q = ($<HTMLInputElement>('product-search').value || '').trim().toLowerCase();
+    const shown = products.filter((p) => !q || `${p.name} ${p.scent ?? ''}`.toLowerCase().includes(q));
+    const ul = $('product-rows');
+    ul.replaceChildren(
+      ...shown.map((p) => {
+        const thumb = h('div', 'photo thumb');
+        if (p.photo) {
+          const img = document.createElement('img');
+          img.src = `/${p.photo}`; img.alt = ''; img.loading = 'lazy';
+          thumb.append(img);
+        }
+        const stock = stockOf(p);
+        const edit = h('button', 'btn ghost small', 'Editar') as HTMLButtonElement;
+        edit.type = 'button';
+        edit.addEventListener('click', () => openProduct(p));
+        return h('li', 'row',
+          thumb,
+          h('div', 'row-main',
+            h('p', 'row-title', p.name),
+            h('p', 'row-sub', [KIND[p.kind] ?? p.kind, p.scent].filter(Boolean).join(' · ')),
+          ),
+          h('div', 'row-prices',
+            h('span', '', `Est. ${money(p.priceStandard)}`),
+            h('span', '', `Pref. ${money(p.pricePreferred)}`),
+          ),
+          h('div', 'row-stock', h('span', `stock ${stock <= 0 ? 'out' : stock <= 3 ? 'low' : 'in'}`,
+            p.kind === 'package' ? `${stock} (calculado)` : `${stock} pzas`)),
+          statusBadge(p),
+          edit,
+        );
+      }),
+    );
+    $('products-status').hidden = shown.length > 0;
+    $('products-status').textContent = products.length ? 'Ningún producto coincide.' : 'Aún no hay productos.';
+  }
+
+  async function loadProducts() {
+    products = (await api<{ products: AdminProduct[] }>('/admin/products')).products;
+    $('scents').replaceChildren(
+      ...[...new Set(products.map((p) => p.scent).filter(Boolean))].map((s) => {
+        const o = document.createElement('option'); o.value = s!; return o;
+      }),
+    );
+    renderProducts();
+  }
+
+  $('product-search').addEventListener('input', renderProducts);
+  $('product-new').addEventListener('click', () => openProduct(null));
+
+  function setPreview(src: string) {
+    const box = $('p-photo-preview');
+    box.replaceChildren();
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src; img.alt = '';
+      box.append(img);
+    }
+  }
+
+  function syncKind() {
+    const isPackage = $<HTMLSelectElement>('p-kind').value === 'package';
+    $('stock-field').hidden = isPackage;
+    $('components-field').hidden = !isPackage;
+  }
+  $('p-kind').addEventListener('change', syncKind);
+
+  function openProduct(p: AdminProduct | null) {
+    editing = p;
+    pickedPhoto = null;
+    const f = $<HTMLFormElement>('product-form');
+    f.reset();
+    $('pd-title').textContent = p ? 'Editar producto' : 'Nuevo producto';
+    $('product-error').textContent = '';
+    const val = (id: string, v: string) => ($<HTMLInputElement>(id).value = v);
+    val('p-name', p?.name ?? '');
+    val('p-kind', p?.kind ?? 'mist');
+    val('p-scent', p?.scent ?? '');
+    val('p-description', p?.description ?? '');
+    val('p-price-standard', p ? (p.priceStandard / 100).toFixed(2) : '');
+    val('p-price-preferred', p ? (p.pricePreferred / 100).toFixed(2) : '');
+    val('p-stock', String(p?.stock ?? 0));
+    val('p-sort', String(p?.sort ?? 0));
+    val('p-status', p?.status ?? 'active');
+    setPreview(p?.photo ? `/${p.photo}` : '');
+
+    // Items that can go in a package (not packages, not itself).
+    const box = $('p-components');
+    box.replaceChildren(
+      ...products
+        .filter((x) => x.kind !== 'package' && x.id !== p?.id)
+        .map((x) => {
+          const cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.value = x.id; cb.id = `pc-${x.id}`;
+          cb.checked = !!p?.components?.includes(x.id);
+          const label = h('label', 'radio', cb, ` ${x.name}`) as HTMLLabelElement;
+          label.htmlFor = cb.id;
+          return label;
+        }),
+    );
+    syncKind();
+    $<HTMLDialogElement>('product-dialog').showModal();
+  }
+
+  // Crop to a centered square, scale to 1200 px, encode as WebP (JPEG if the
+  // browser can't make WebP). Every product photo ends up the same shape.
+  async function standardize(file: File): Promise<Blob> {
+    const bmp = await createImageBitmap(file);
+    const side = Math.min(bmp.width, bmp.height);
+    const out = Math.min(1200, side);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = out;
+    canvas.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
+    const toBlob = (type: string) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.85));
+    const webp = await toBlob('image/webp');
+    if (webp && webp.type === 'image/webp') return webp;
+    return (await toBlob('image/jpeg'))!;
+  }
+
+  $('p-photo').addEventListener('change', async () => {
+    const file = $<HTMLInputElement>('p-photo').files?.[0];
+    if (!file) return;
+    try {
+      pickedPhoto = await standardize(file);
+      setPreview(URL.createObjectURL(pickedPhoto));
+    } catch {
+      pickedPhoto = null;
+      $('product-error').textContent = 'No pudimos leer esa imagen. Prueba con una foto JPG o PNG.';
+    }
+  });
+
+  const toBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1]);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+
+  $('product-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('product-error');
+    const get = (id: string) => $<HTMLInputElement>(id).value;
+    const priceStandard = toCents(get('p-price-standard'));
+    const pricePreferred = toCents(get('p-price-preferred'));
+    if (priceStandard === null || pricePreferred === null) {
+      err.textContent = 'Escribe los precios como 120 o 120.50.';
+      return;
+    }
+    const body = {
+      name: get('p-name'),
+      kind: get('p-kind'),
+      scent: get('p-scent'),
+      description: get('p-description'),
+      priceStandard,
+      pricePreferred,
+      stock: Number.parseInt(get('p-stock') || '0', 10),
+      sort: Number.parseInt(get('p-sort') || '0', 10),
+      status: get('p-status'),
+      components: [...$('p-components').querySelectorAll<HTMLInputElement>('input:checked')].map((c) => c.value),
+    };
+    const save = $<HTMLButtonElement>('product-save');
+    save.disabled = true;
+    err.textContent = '';
+    try {
+      const { product } = editing
+        ? await api<{ product: AdminProduct }>(`/admin/products/${encodeURIComponent(editing.id)}`, { method: 'PUT', json: body })
+        : await api<{ product: AdminProduct }>('/admin/products', { method: 'POST', json: body });
+      if (pickedPhoto) {
+        await api(`/admin/products/${encodeURIComponent(product.id)}/photo`, {
+          method: 'POST',
+          json: { data: await toBase64(pickedPhoto) },
+        });
+      }
+      $<HTMLDialogElement>('product-dialog').close();
+      await loadProducts();
+    } catch (e2) {
+      err.textContent = errorText(e2);
+    } finally {
+      save.disabled = false;
+    }
+  });
+
+  // ---------------------------------------------------------------- distributors
+  let users: AdminUser[] = [];
+  let editingUser: AdminUser | null = null;
+
+  function renderUsers() {
+    $('users-status').hidden = users.length > 0;
+    $('users-status').textContent = 'Aún no hay distribuidores.';
+    $('user-rows').replaceChildren(
+      ...users.map((u) => {
+        // Without access the tier doesn't matter, so show only "Sin acceso".
+        const tier = u.role === 'admin' ? h('span', 'pill', 'Administración')
+          : u.status !== 'active' ? h('span', 'pill muted', 'Sin acceso')
+          : h('span', `pill ${u.tier === 'preferred' ? 'ok' : ''}`, u.tier === 'preferred' ? 'Preferente' : 'Estándar');
+        const access = null;
+        let action: HTMLElement;
+        if (u.role === 'admin') {
+          action = h('span', 'hint', 'Se cambia en Terraform');
+        } else {
+          action = h('button', 'btn ghost small', 'Editar');
+          (action as HTMLButtonElement).type = 'button';
+          action.addEventListener('click', () => openUser(u));
+        }
+        return h('li', 'row',
+          h('div', 'avatar', (u.name || u.email).charAt(0).toUpperCase()),
+          h('div', 'row-main', h('p', 'row-title', u.name), h('p', 'row-sub', u.email)),
+          tier, access, action,
+        );
+      }),
+    );
+  }
+
+  async function loadUsers() {
+    users = (await api<{ users: AdminUser[] }>('/admin/users')).users;
+    renderUsers();
+  }
+
+  function openUser(u: AdminUser | null) {
+    editingUser = u;
+    $<HTMLFormElement>('user-form').reset();
+    $('ud-title').textContent = u ? 'Editar distribuidor' : 'Agregar distribuidor';
+    $('user-error').textContent = '';
+    const email = $<HTMLInputElement>('u-email');
+    email.value = u?.email ?? '';
+    email.readOnly = !!u;
+    $<HTMLInputElement>('u-name').value = u?.name ?? '';
+    $<HTMLInputElement>(`u-tier-${u?.tier ?? 'standard'}`).checked = true;
+    $<HTMLInputElement>(`u-status-${u?.status ?? 'active'}`).checked = true;
+    syncAccess();
+    $<HTMLDialogElement>('user-dialog').showModal();
+  }
+
+  // Grey out the tier while "Sin acceso" is selected.
+  function syncAccess() {
+    const removed = $<HTMLInputElement>('u-status-removed').checked;
+    $('u-tier').classList.toggle('dimmed', removed);
+    $('u-tier-note').hidden = !removed;
+  }
+  for (const id of ['u-status-active', 'u-status-removed']) $(id).addEventListener('change', syncAccess);
+  $('user-new').addEventListener('click', () => openUser(null));
+
+  $('user-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    const email = String(f.get('email') ?? '').trim().toLowerCase();
+    if (!editingUser && users.some((u) => u.email === email)) {
+      $('user-error').textContent = 'Ese correo ya está registrado. Búscalo en la lista para editarlo.';
+      return;
+    }
+    try {
+      await api(`/admin/users/${encodeURIComponent(email)}`, {
+        method: 'PUT',
+        json: { name: f.get('name'), tier: f.get('tier'), status: f.get('status') },
+      });
+      $<HTMLDialogElement>('user-dialog').close();
+      await loadUsers();
+    } catch (e2) {
+      $('user-error').textContent = errorText(e2);
+    }
+  });
+
+  // ---------------------------------------------------------------- settings
+  async function loadSettings() {
+    const { settings } = await api<{ settings: { ordersWhatsApp: string } }>('/admin/settings');
+    $<HTMLInputElement>('s-whatsapp').value = settings.ordersWhatsApp ?? '';
+  }
+
+  $('settings-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('settings-error').textContent = '';
+    $('settings-saved').textContent = '';
+    try {
+      const { settings } = await api<{ settings: { ordersWhatsApp: string } }>('/admin/settings', {
+        method: 'PUT',
+        json: { ordersWhatsApp: $<HTMLInputElement>('s-whatsapp').value },
+      });
+      $<HTMLInputElement>('s-whatsapp').value = settings.ordersWhatsApp;
+      $('settings-saved').textContent = 'Guardado.';
+    } catch (e2) {
+      $('settings-error').textContent = errorText(e2);
+    }
+  });
+
+  // ---------------------------------------------------------------- start
+  async function main() {
+    await requireUser();
+    try {
+      // The catalog call tells us the caller's role without a separate endpoint.
+      const me = await api<Catalog>('/catalog');
+      if (me.user.role !== 'admin') {
+        location.replace('/inicio');
+        return;
+      }
+      await Promise.all([loadProducts(), loadUsers(), loadSettings()]);
+      $('page-status').hidden = true;
+      $('main').hidden = false;
+    } catch (e) {
+      $('page-status').textContent = errorText(e);
+    }
+  }
+
+  main();
+</script>

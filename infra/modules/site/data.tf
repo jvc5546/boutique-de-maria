@@ -1,9 +1,11 @@
 # One DynamoDB table for the whole site ("single-table design"). Every record
 # type shares it, told apart by its keys:
 #
-#   pk = USER#<email>   sk = PROFILE   -> an admin or distributor
+#   pk = USER#<email>   sk = PROFILE   -> an admin or distributor (type = user)
+#   pk = PRODUCT        sk = <id>      -> a product or package    (type = product)
+#   pk = SETTINGS       sk = GLOBAL    -> site settings (orders WhatsApp number)
 #
-# Products, orders and catalogs join in later milestones. On-demand billing:
+# The by-type index lists every record of one type (all users, for the admin page). On-demand billing:
 # no capacity to manage, and at this scale it costs cents a month at most.
 
 resource "aws_dynamodb_table" "main" {
@@ -20,6 +22,26 @@ resource "aws_dynamodb_table" "main" {
   attribute {
     name = "sk"
     type = "S"
+  }
+
+  attribute {
+    name = "type"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "by-type"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "type"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "pk"
+      key_type       = "RANGE"
+    }
   }
 
   # Restore to any second in the last 35 days. Billed per GB; this table is

@@ -9,6 +9,7 @@ import Base from '../layouts/Base.astro';
     <div class="who">
       <span id="who-name"></span>
       <span class="badge small" id="who-badge"></span>
+      <a class="link" id="admin-link" href="/admin" hidden>Administrar</a>
       <button class="link" id="signout" type="button">Salir</button>
     </div>
   </header>
@@ -66,6 +67,14 @@ import Base from '../layouts/Base.astro';
   function card(p: Product) {
     const photo = h('div', 'photo', h('span', '', p.scent || p.name));
     photo.style.setProperty('--hue', hue(p.scent || p.name));
+    if (p.photo) {
+      const img = document.createElement('img');
+      img.src = p.photo;
+      img.alt = p.name;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      photo.replaceChildren(img);
+    }
 
     const price = h('p', 'price', money(p.price));
     const adminPrices =
@@ -139,6 +148,7 @@ import Base from '../layouts/Base.astro';
         .forEach((scent, i) => scentHue.set(scent, String(HUES[i % HUES.length])));
       isAdmin = data.user.role === 'admin';
       document.getElementById('who-name')!.textContent = data.user.name;
+      document.getElementById('admin-link')!.hidden = !isAdmin;
       document.getElementById('who-badge')!.textContent = isAdmin
         ? 'Administración'
         : data.user.tier === 'preferred'
