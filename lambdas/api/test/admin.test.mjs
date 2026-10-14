@@ -21,6 +21,7 @@ function fakeDb() {
     getUser: async (e) => db.users[e] ?? null,
     listUsers: async () => Object.values(db.users),
     putUser: async (u) => { db.users[u.email] = u; },
+    deleteUser: async (e) => { delete db.users[e]; },
     listProducts: async () => db.products,
     putProduct: async (p) => { db.products = [...db.products.filter((x) => x.id !== p.id), p]; },
     getSettings: async () => db.settings,
@@ -61,16 +62,26 @@ test('create a product: id from the name, accents removed, unique', async () => 
   assert.equal(db.products.length, 4);
 });
 
-test('package rules: 2+ existing items, no nested packages, no own stock', async () => {
+test('paquetes cannot be created by hand; size defaults by type', async () => {
   const { handler } = setup();
-  const pkg = { name: 'Paquete Vainilla', kind: 'package', scent: 'Vainilla', priceStandard: 20000, pricePreferred: 17000, components: ['bruma-vainilla', 'locion-vainilla'], stock: 99 };
-  const ok = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: pkg });
+  const pkg = { ...newMist, kind: 'package', components: ['bruma-vainilla', 'locion-vainilla'] };
+  assert.equal((await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: pkg })).status, 400);
+  const mist = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: newMist });
+  assert.equal(mist.body.product.size, '250 ml');
+  const lotion = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...newMist, kind: 'lotion' } });
+  assert.equal(lotion.body.product.size, '236 ml');
+});
+
+test('settings: paquete discounts per kind and tier; WhatsApp may be empty', async () => {
+  const { handler, db } = setup();
+  const body = { ordersWhatsApp: '', packageDiscount: { one: { standard: 4000, preferred: 3000 }, all: { standard: 9000 } } };
+  const ok = await call(handler, 'PUT /api/admin/settings', 'jona@example.com', { body });
   assert.equal(ok.status, 200);
-  assert.equal(ok.body.product.stock, undefined);
-  const one = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...pkg, components: ['bruma-vainilla'] } });
-  assert.equal(one.status, 400);
-  const nested = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...pkg, components: ['bruma-vainilla', 'paquete-vainilla'] } });
-  assert.equal(nested.status, 400);
+  assert.deepEqual(db.settings.packageDiscount, { one: { preferred: 3000, standard: 4000 }, all: { preferred: 0, standard: 9000 } });
+  const bad = await call(handler, 'PUT /api/admin/settings', 'jona@example.com', { body: { packageDiscount: { one: { standard: -1 } } } });
+  assert.equal(bad.status, 400);
+  const got = await call(handler, 'GET /api/admin/settings', 'jona@example.com');
+  assert.equal(got.body.settings.packageDiscount.all.standard, 9000);
 });
 
 test('preferred price cannot exceed standard', async () => {
@@ -111,13 +122,13 @@ test('photo upload: WebP accepted and stored under a fresh name; other files ref
   assert.equal((await call(handler, 'POST /api/admin/products/{id}/photo', 'jona@example.com', { params: { id: 'bruma-vainilla' }, body: { data: html } })).status, 400);
 });
 
-test('distributors: add, change tier, remove; admins are off-limits', async () => {
+test('distributors: add, change tier; admins are off-limits', async () => {
   const { handler, db } = setup();
   const add = await call(handler, 'PUT /api/admin/users/{email}', 'jona@example.com', { params: { email: 'Luis%40Example.com' }, body: { name: 'Luis', tier: 'preferred', status: 'active' } });
   assert.equal(add.status, 200);
   assert.equal(db.users['luis@example.com'].role, 'distributor');
-  await call(handler, 'PUT /api/admin/users/{email}', 'jona@example.com', { params: { email: 'luis@example.com' }, body: { name: 'Luis', tier: 'standard', status: 'removed' } });
-  assert.equal(db.users['luis@example.com'].status, 'removed');
+  await call(handler, 'PUT /api/admin/users/{email}', 'jona@example.com', { params: { email: 'luis@example.com' }, body: { name: 'Luis', tier: 'standard' } });
+  assert.equal(db.users['luis@example.com'].tier, 'standard');
   const admin = await call(handler, 'PUT /api/admin/users/{email}', 'jona@example.com', { params: { email: 'jona@example.com' }, body: { name: 'X', tier: 'standard', status: 'removed' } });
   assert.equal(admin.status, 400);
   assert.equal(db.users['jona@example.com'].status, 'active');
@@ -138,4 +149,34 @@ test('helpers', () => {
   assert.deepEqual(plain(typed({ a: 'x', n: 1, l: ['p'], b: false, m: { k: 'v' }, u: undefined })), { a: 'x', n: 1, l: ['p'], b: false, m: { k: 'v' } });
   assert.ok(validatePhoto({ data: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0]).toString('base64') }).value);
   assert.ok(validateProduct('Bad Id', {}, { now: NOW }).error);
+});
+
+test('size is optional, trimmed, and limited to 20 characters', async () => {
+  const { handler } = setup();
+  const a = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...newMist, size: '  250 ml ' } });
+  assert.equal(a.body.product.size, '250 ml');
+  const b = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...newMist, size: 'x'.repeat(21) } });
+  assert.equal(b.status, 400);
+  const c = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...newMist, kind: 'other' } });
+  assert.equal(c.body.product.size, '');
+});
+
+test('adding a distributor always grants access; deleting removes it', async () => {
+  const { handler, db } = setup();
+  const put = await call(handler, 'PUT /api/admin/users/{email}', 'jona@example.com', {
+    params: { email: 'luz@example.com' }, body: { name: 'Luz', tier: 'standard', status: 'removed' },
+  });
+  assert.equal(put.body.user.status, 'active');
+  const del = await call(handler, 'DELETE /api/admin/users/{email}', 'jona@example.com', { params: { email: 'luz@example.com' } });
+  assert.equal(del.status, 200);
+  assert.equal(db.users['luz@example.com'], undefined);
+  const after = await call(handler, 'GET /api/catalog', 'luz@example.com');
+  assert.equal(after.status, 401);
+});
+
+test('admins cannot be deleted from the admin page', async () => {
+  const { handler, db } = setup();
+  const r = await call(handler, 'DELETE /api/admin/users/{email}', 'jona@example.com', { params: { email: 'jona@example.com' } });
+  assert.equal(r.status, 400);
+  assert.ok(db.users['jona@example.com']);
 });

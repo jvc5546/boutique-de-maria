@@ -53,24 +53,36 @@ function goTo(to: string): Promise<never> {
 
 export type Kind = 'mist' | 'lotion' | 'package' | string;
 
+/** A store section, defined in lambdas/api/src/departments.mjs. */
+export interface Department {
+  id: string;
+  name: string;
+  kinds: Record<string, [string, string]>; // kind -> [singular, plural]
+  scent: boolean;
+  packages: boolean;
+}
+
 export interface Product {
   id: string;
   kind: Kind;
+  department: string;
   name: string;
   description: string;
   scent: string;
+  size: string; // "250 ml" or ""
   photo: string; // "/media/products/..." or ""
   price: number; // cents, MXN
   prices?: { standard: number; preferred: number }; // admins only
   availability: 'in' | 'low' | 'out';
   stock: number;
-  components: { id: string; name: string }[];
+  components: { id: string; name: string; kind: Kind; photo: string }[];
   related: { id: string; name: string }[];
 }
 
 export interface Catalog {
-  user: { name: string; role: 'admin' | 'distributor'; tier: string };
+  user: { name: string; role: 'admin' | 'distributor'; tier?: string }; // tier: admins only
   settings: { ordersWhatsApp: string };
+  departments: Department[];
   products: Product[];
 }
 
@@ -82,14 +94,15 @@ export interface AdminProduct {
   name: string;
   description?: string;
   scent?: string;
+  size?: string;
   priceStandard: number;
   pricePreferred: number;
   stock?: number;
-  components?: string[];
   status: 'active' | 'archived';
   sort?: number;
   photo?: string;
   outOfStockSince?: string;
+  department?: string;
   listed?: boolean; // false when archived, or 60+ days out of stock
 }
 

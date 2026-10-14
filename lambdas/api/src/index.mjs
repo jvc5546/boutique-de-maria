@@ -8,7 +8,8 @@
 // page, so the API answers 401 for "not allowed" (no-invitado / solo-admin)
 // and 400 for anything wrong with the request.
 
-import { buildCatalog, isListed } from './catalog.mjs';
+import { buildCatalog, departmentsFor, discounts, isListed } from './catalog.mjs';
+import { departmentOf } from './departments.mjs';
 import { slugify, validatePhoto, validateProduct, validateSettings, validateUser } from './validate.mjs';
 
 export function makeHandler(db, clock = () => new Date()) {
@@ -24,10 +25,13 @@ export function makeHandler(db, clock = () => new Date()) {
 
     if (route === 'GET /api/catalog') {
       const [records, settings] = await Promise.all([db.listProducts(), db.getSettings()]);
+      const products = buildCatalog(records, user, Date.parse(now), settings);
       return json(200, {
-        user: { name: user.name ?? '', role: user.role, tier: user.tier ?? '' },
+        // Distributors aren't told which level they are; only admins get it.
+        user: { name: user.name ?? '', role: user.role, ...(user.role === 'admin' ? { tier: user.tier ?? '' } : {}) },
         settings: { ordersWhatsApp: settings?.ordersWhatsApp ?? '' },
-        products: buildCatalog(records, user, Date.parse(now)),
+        departments: departmentsFor(products),
+        products,
       });
     }
 
@@ -53,14 +57,16 @@ export function makeHandler(db, clock = () => new Date()) {
     switch (route) {
       case 'GET /api/admin/products': {
         const now_ = Date.parse(now);
+        // Old hand-made package records are left out: paquetes are automatic now.
         const products = (await db.listProducts())
-          .map((p) => ({ ...p, listed: isListed(p, now_) }))
+          .filter((p) => p.kind !== 'package')
+          .map((p) => ({ ...p, department: departmentOf(p.kind), listed: isListed(p, now_) }))
           .sort((a, b) => (a.scent ?? '').localeCompare(b.scent ?? '', 'es') || (a.sort ?? 0) - (b.sort ?? 0));
-        return json(200, { products });
+        return json(200, { products, departments: departmentsFor([], { all: true }) });
       }
 
       case 'POST /api/admin/products': {
-        // New product: the id comes from the name (Bruma Vainilla -> bruma-vainilla).
+        // New product: the id comes from the name (Mist Vainilla -> mist-vainilla).
         const products = await db.listProducts();
         const taken = new Set(products.map((p) => p.id));
         const base = slugify(body.name) || 'producto';
@@ -112,8 +118,22 @@ export function makeHandler(db, clock = () => new Date()) {
         return json(200, { user: value });
       }
 
+      // Removing someone deletes their record: no record, no way in. Admins
+      // live in Terraform (ADMINS) and can't be deleted from here.
+      case 'DELETE /api/admin/users/{email}': {
+        const target = param('email').toLowerCase();
+        const existing = await db.getUser(target);
+        if (!existing) return json(400, { error: 'Ese correo no está en la lista.' });
+        if (existing.role === 'admin') return json(400, { error: 'Las cuentas de administración se cambian en Terraform.' });
+        await db.deleteUser(target);
+        return json(200, { deleted: target });
+      }
+
       case 'GET /api/admin/settings':
-        return json(200, { settings: (await db.getSettings()) ?? { ordersWhatsApp: '' } });
+      {
+        const s = await db.getSettings();
+        return json(200, { settings: { ordersWhatsApp: s?.ordersWhatsApp ?? '', packageDiscount: discounts(s) } });
+      }
 
       case 'PUT /api/admin/settings': {
         const { value, error } = validateSettings(body, { now });
@@ -211,6 +231,10 @@ const dynamoDb = {
       ExpressionAttributeValues: { ':t': { S: 'user' } },
     }),
   putUser: (user) => putItem(user),
+  deleteUser: async (email) => {
+    const { ddb, dynamo } = await aws();
+    await dynamo.send(new ddb.DeleteItemCommand({ TableName: TABLE(), Key: typed({ pk: `USER#${email}`, sk: 'PROFILE' }) }));
+  },
 
   listProducts: () =>
     queryAll({
