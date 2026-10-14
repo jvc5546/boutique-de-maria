@@ -532,6 +532,13 @@ input, select, textarea {
 textarea { resize: vertical; min-height: 88px; }
 input[type='checkbox'], input[type='radio'] { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--accent); }
 
+.admin-group { margin-top: 22px; }
+.admin-group:first-child { margin-top: 4px; }
+.admin-group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.admin-group-head h2 { font-size: 1.25rem; }
+.admin-group-head .btn { margin-left: auto; align-self: center; }
+.row.clickable { cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+.row.clickable:hover { border-color: #ddd2cc; box-shadow: var(--shadow); }
 .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .row {
   display: grid;
@@ -547,7 +554,9 @@ input[type='checkbox'], input[type='radio'] { width: 20px; height: 20px; min-hei
 .row-title { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 .row-sub { margin: 0; font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
 .row-prices, .row-stock { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-.row > .pill { grid-column: 2; justify-self: start; }
+.row > .row-stock { grid-column: 2; }
+.row > .pill { grid-column: 3; justify-self: end; }
+.row.clickable > .pill.ok { display: none; } /* "En catálogo" is the normal state; on phones show only exceptions */
 .row > .btn, .row > .hint { grid-column: 3; grid-row: 1; }
 .photo.thumb { width: 44px; height: 44px; aspect-ratio: auto; border-radius: var(--r-sm); overflow: hidden; }
 .photo.thumb img { padding: 0; }
@@ -621,7 +630,9 @@ fieldset.field { border: 0; padding: 0; }
   .row { grid-template-columns: 52px minmax(0, 1fr) auto auto auto auto; }
   .row .photo.thumb, .row .avatar { width: 52px; height: 52px; }
   .row-prices, .row-stock { grid-column: auto; display: grid; gap: 0; text-align: right; }
-  .row > .pill { grid-column: auto; }
+  .row > .pill { grid-column: auto; justify-self: start; }
+  .row > .row-stock { grid-column: auto; }
+  .row.clickable > .pill.ok { display: inline-block; }
   .row > .btn, .row > .hint { grid-column: auto; grid-row: auto; }
   .catalog-head { grid-template-columns: 1fr; }
 }

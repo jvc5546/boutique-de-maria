@@ -47,7 +47,7 @@ import Base from '../layouts/Base.astro';
         <button class="btn" id="product-new" type="button">+ Nuevo producto</button>
       </div>
       <p class="status" id="products-status">Cargando…</p>
-      <ul class="rows" id="product-rows"></ul>
+      <div id="product-groups"></div>
     </section>
 
     <!-- Distribuidores -->
@@ -240,9 +240,13 @@ import Base from '../layouts/Base.astro';
   function renderProducts() {
     const q = $<HTMLInputElement>('product-search').value || '';
     const shown = products.filter((p) => matches(q, p.name, p.scent, p.size, KIND[p.kind]));
-    const ul = $('product-rows');
-    ul.replaceChildren(
-      ...shown.map((p) => {
+    // Grouped by fragrance (like the catalog): loción first, then mists, then the rest.
+    const ORDER: Record<string, number> = { lotion: 0, mist: 1 };
+    const byScent = new Map<string, AdminProduct[]>();
+    for (const p of shown) byScent.set(p.scent ?? '', [...(byScent.get(p.scent ?? '') ?? []), p]);
+    const scents = [...byScent.keys()].sort((a, b) => (!a ? 1 : !b ? -1 : a.localeCompare(b, 'es')));
+
+    const row = (p: AdminProduct) => {
         const thumb = h('div', 'photo thumb');
         if (p.photo) {
           const img = document.createElement('img');
@@ -253,11 +257,11 @@ import Base from '../layouts/Base.astro';
         const edit = h('button', 'btn ghost small', 'Editar') as HTMLButtonElement;
         edit.type = 'button';
         edit.addEventListener('click', () => openProduct(p));
-        return h('li', 'row',
+        const li = h('li', 'row clickable',
           thumb,
           h('div', 'row-main',
             h('p', 'row-title', p.name),
-            h('p', 'row-sub', [KIND[p.kind] ?? p.kind, p.scent, p.size].filter(Boolean).join(' · ')),
+            h('p', 'row-sub', [KIND[p.kind] ?? p.kind, p.size].filter(Boolean).join(' · ')),
           ),
           h('div', 'row-prices',
             h('span', '', `Est. ${money(p.priceStandard)}`),
@@ -267,6 +271,28 @@ import Base from '../layouts/Base.astro';
             `${stock} pzas`)),
           statusBadge(p),
           edit,
+        );
+        // The whole row opens the editor (bigger target than the button alone).
+        li.addEventListener('click', (e) => {
+          if (!(e.target as HTMLElement).closest('button')) openProduct(p);
+        });
+        return li;
+    };
+
+    $('product-groups').replaceChildren(
+      ...scents.map((scent) => {
+        const list = byScent.get(scent)!.sort((a, b) => (ORDER[a.kind] ?? 2) - (ORDER[b.kind] ?? 2) || a.name.localeCompare(b.name, 'es'));
+        const add = h('button', 'btn ghost small', '+ Agregar') as HTMLButtonElement;
+        add.type = 'button';
+        add.setAttribute('aria-label', `Agregar producto a ${scent || 'Sin fragancia'}`);
+        add.addEventListener('click', () => openProduct(null, scent));
+        return h('section', 'admin-group',
+          h('div', 'admin-group-head',
+            h('h2', '', scent || 'Sin fragancia'),
+            h('span', 'muted', `${list.length} ${list.length === 1 ? 'producto' : 'productos'}`),
+            scent ? add : null,
+          ),
+          h('ul', 'rows', ...list.map(row)),
         );
       }),
     );
@@ -297,7 +323,7 @@ import Base from '../layouts/Base.astro';
     }
   }
 
-  function openProduct(p: AdminProduct | null) {
+  function openProduct(p: AdminProduct | null, scent = '') {
     editing = p;
     pickedPhoto = null;
     const f = $<HTMLFormElement>('product-form');
@@ -307,7 +333,7 @@ import Base from '../layouts/Base.astro';
     const val = (id: string, v: string) => ($<HTMLInputElement>(id).value = v);
     val('p-name', p?.name ?? '');
     val('p-kind', p?.kind ?? 'mist');
-    val('p-scent', p?.scent ?? '');
+    val('p-scent', p?.scent ?? scent);
     val('p-size', p?.size ?? '');
     val('p-description', p?.description ?? '');
     val('p-price-standard', p ? (p.priceStandard / 100).toFixed(2) : '');
