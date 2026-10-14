@@ -65,7 +65,7 @@ export interface Product {
   prices?: { standard: number; preferred: number }; // admins only
   availability: 'in' | 'low' | 'out';
   stock: number;
-  components: { id: string; name: string }[];
+  components: { id: string; name: string; kind: Kind; photo: string }[];
   related: { id: string; name: string }[];
 }
 
@@ -87,7 +87,6 @@ export interface AdminProduct {
   priceStandard: number;
   pricePreferred: number;
   stock?: number;
-  components?: string[];
   status: 'active' | 'archived';
   sort?: number;
   photo?: string;

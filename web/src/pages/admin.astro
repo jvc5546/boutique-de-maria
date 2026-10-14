@@ -53,9 +53,33 @@ import Base from '../layouts/Base.astro';
         <label for="s-whatsapp">WhatsApp para pedidos</label>
         <input id="s-whatsapp" name="ordersWhatsApp" type="tel" inputmode="tel" autocomplete="off" placeholder="+52 55 1234 5678" />
         <p class="hint">Con <b>+</b> y código de país (México +52, Estados Unidos +1). Los pedidos de las distribuidoras llegan a este número.</p>
+
+        <h2 class="panel-title">Descuento de paquetes</h2>
+        <p class="hint">Los paquetes se arman solos con la loción y los mists de la misma fragancia. Su precio es la suma de los productos menos este descuento.</p>
+        <fieldset class="field">
+          <legend>Loción + 1 mist</legend>
+          <div class="grid2">
+            <div class="field"><label for="d-one-standard">Estándar ($)</label><input id="d-one-standard" inputmode="decimal" placeholder="0.00" /></div>
+            <div class="field"><label for="d-one-preferred">Preferente ($)</label><input id="d-one-preferred" inputmode="decimal" placeholder="0.00" /></div>
+          </div>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Paquete completo (loción + todos los mists)</legend>
+          <div class="grid2">
+            <div class="field"><label for="d-all-standard">Estándar ($)</label><input id="d-all-standard" inputmode="decimal" placeholder="0.00" /></div>
+            <div class="field"><label for="d-all-preferred">Preferente ($)</label><input id="d-all-preferred" inputmode="decimal" placeholder="0.00" /></div>
+          </div>
+          <p class="hint">Solo aplica cuando una fragancia tiene más de un mist (por ejemplo, normal y shimmer).</p>
+        </fieldset>
         <p class="form-error" id="settings-error" role="alert"></p>
         <div class="actions"><button class="btn" type="submit">Guardar</button><span class="saved" id="settings-saved"></span></div>
       </form>
+
+      <section class="panel packages">
+        <h2 class="panel-title">Paquetes automáticos</h2>
+        <p class="hint" id="pk-empty">Aún no hay paquetes: agrega una loción y un mist con la misma fragancia.</p>
+        <ul class="rows" id="pk-rows"></ul>
+      </section>
     </section>
   </main>
 
@@ -75,7 +99,6 @@ import Base from '../layouts/Base.astro';
           <select id="p-kind" name="kind">
             <option value="mist">Mist</option>
             <option value="lotion">Loción</option>
-            <option value="package">Paquete</option>
             <option value="other">Otro</option>
           </select>
         </div>
@@ -86,7 +109,8 @@ import Base from '../layouts/Base.astro';
         </div>
         <div class="field">
           <label for="p-size">Tamaño</label>
-          <input id="p-size" name="size" maxlength="20" placeholder="250 ml" />
+          <input id="p-size" name="size" maxlength="20" placeholder="Automático" aria-describedby="p-size-hint" />
+          <p class="hint" id="p-size-hint">Vacío: Mist 250 ml, Loción 236 ml.</p>
         </div>
         <div class="field span2">
           <label for="p-description">Descripción</label>
@@ -104,15 +128,6 @@ import Base from '../layouts/Base.astro';
           <label for="p-stock">Existencias</label>
           <input id="p-stock" name="stock" type="number" min="0" step="1" inputmode="numeric" />
         </div>
-        <div class="field">
-          <label for="p-sort">Orden</label>
-          <input id="p-sort" name="sort" type="number" min="0" step="1" inputmode="numeric" />
-        </div>
-        <fieldset class="field span2" id="components-field" hidden>
-          <legend>Incluye (2 o más)</legend>
-          <div class="checks" id="p-components"></div>
-          <p class="hint">Las existencias del paquete son las del producto que tenga menos.</p>
-        </fieldset>
         <div class="field">
           <label for="p-status">Estado</label>
           <select id="p-status" name="status">
@@ -207,11 +222,6 @@ import Base from '../layouts/Base.astro';
     return h('span', 'pill ok', 'En catálogo');
   }
 
-  function stockOf(p: AdminProduct) {
-    if (p.kind !== 'package') return p.stock ?? 0;
-    const items = (p.components ?? []).map((id) => products.find((x) => x.id === id));
-    return items.length && items.every(Boolean) ? Math.min(...items.map((x) => x!.stock ?? 0)) : 0;
-  }
 
   function renderProducts() {
     const q = $<HTMLInputElement>('product-search').value || '';
@@ -225,7 +235,7 @@ import Base from '../layouts/Base.astro';
           img.src = `/${p.photo}`; img.alt = ''; img.loading = 'lazy';
           thumb.append(img);
         }
-        const stock = stockOf(p);
+        const stock = p.stock ?? 0;
         const edit = h('button', 'btn ghost small', 'Editar') as HTMLButtonElement;
         edit.type = 'button';
         edit.addEventListener('click', () => openProduct(p));
@@ -240,7 +250,7 @@ import Base from '../layouts/Base.astro';
             h('span', '', `Pref. ${money(p.pricePreferred)}`),
           ),
           h('div', 'row-stock', h('span', `stock ${stock <= 0 ? 'out' : stock <= 3 ? 'low' : 'in'}`,
-            p.kind === 'package' ? `${stock} (calculado)` : `${stock} pzas`)),
+            `${stock} pzas`)),
           statusBadge(p),
           edit,
         );
@@ -273,13 +283,6 @@ import Base from '../layouts/Base.astro';
     }
   }
 
-  function syncKind() {
-    const isPackage = $<HTMLSelectElement>('p-kind').value === 'package';
-    $('stock-field').hidden = isPackage;
-    $('components-field').hidden = !isPackage;
-  }
-  $('p-kind').addEventListener('change', syncKind);
-
   function openProduct(p: AdminProduct | null) {
     editing = p;
     pickedPhoto = null;
@@ -296,25 +299,9 @@ import Base from '../layouts/Base.astro';
     val('p-price-standard', p ? (p.priceStandard / 100).toFixed(2) : '');
     val('p-price-preferred', p ? (p.pricePreferred / 100).toFixed(2) : '');
     val('p-stock', String(p?.stock ?? 0));
-    val('p-sort', String(p?.sort ?? 0));
     val('p-status', p?.status ?? 'active');
     setPreview(p?.photo ? `/${p.photo}` : '');
 
-    // Items that can go in a package (not packages, not itself).
-    const box = $('p-components');
-    box.replaceChildren(
-      ...products
-        .filter((x) => x.kind !== 'package' && x.id !== p?.id)
-        .map((x) => {
-          const cb = document.createElement('input');
-          cb.type = 'checkbox'; cb.value = x.id; cb.id = `pc-${x.id}`;
-          cb.checked = !!p?.components?.includes(x.id);
-          const label = h('label', 'radio', cb, ` ${x.name}`) as HTMLLabelElement;
-          label.htmlFor = cb.id;
-          return label;
-        }),
-    );
-    syncKind();
     $<HTMLDialogElement>('product-dialog').showModal();
   }
 
@@ -378,9 +365,7 @@ import Base from '../layouts/Base.astro';
       priceStandard,
       pricePreferred,
       stock: Number.parseInt(get('p-stock') || '0', 10),
-      sort: Number.parseInt(get('p-sort') || '0', 10),
       status: get('p-status'),
-      components: [...$('p-components').querySelectorAll<HTMLInputElement>('input:checked')].map((c) => c.value),
     };
     const save = $<HTMLButtonElement>('product-save');
     save.disabled = true;
@@ -396,7 +381,7 @@ import Base from '../layouts/Base.astro';
         });
       }
       $<HTMLDialogElement>('product-dialog').close();
-      await loadProducts();
+      await Promise.all([loadProducts(), loadPackages()]);
     } catch (e2) {
       err.textContent = errorText(e2);
     } finally {
@@ -500,22 +485,69 @@ import Base from '../layouts/Base.astro';
   });
 
   // ---------------------------------------------------------------- settings
+  type Tiers = { standard: number; preferred: number };
+  type Settings = { ordersWhatsApp: string; packageDiscount: { one: Tiers; all: Tiers } };
+  const DISCOUNTS = ['one', 'all'] as const;
+  const TIER_KEYS = ['standard', 'preferred'] as const;
+
+  function showSettings(s: Settings) {
+    $<HTMLInputElement>('s-whatsapp').value = s.ordersWhatsApp ?? '';
+    for (const k of DISCOUNTS) for (const t of TIER_KEYS) {
+      const v = s.packageDiscount?.[k]?.[t] ?? 0;
+      $<HTMLInputElement>(`d-${k}-${t}`).value = v ? (v / 100).toFixed(2) : '';
+    }
+  }
+
   async function loadSettings() {
-    const { settings } = await api<{ settings: { ordersWhatsApp: string } }>('/admin/settings');
-    $<HTMLInputElement>('s-whatsapp').value = settings.ordersWhatsApp ?? '';
+    showSettings((await api<{ settings: Settings }>('/admin/settings')).settings);
+  }
+
+  // The automatic paquetes, as the catalog builds them (with both prices).
+  async function loadPackages(catalog?: Catalog) {
+    const c = catalog ?? (await api<Catalog>('/catalog'));
+    const list = c.products.filter((p) => p.kind === 'package');
+    $('pk-empty').hidden = list.length > 0;
+    $('pk-rows').replaceChildren(
+      ...list.map((p) =>
+        h('li', 'row',
+          (() => {
+            const t = h('div', 'photo thumb');
+            if (p.photo) { const img = document.createElement('img'); img.src = p.photo; img.alt = ''; t.append(img); }
+            return t;
+          })(),
+          h('div', 'row-main', h('p', 'row-title', p.name), h('p', 'row-sub', p.components.map((x) => x.name).join(' + '))),
+          h('div', 'row-prices',
+            h('span', '', `Est. ${money(p.prices?.standard ?? 0)}`),
+            h('span', '', `Pref. ${money(p.prices?.preferred ?? 0)}`),
+          ),
+          h('div', 'row-stock', h('span', `stock ${p.availability}`, `${p.stock} pzas`)),
+        ),
+      ),
+    );
   }
 
   $('settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('settings-error').textContent = '';
     $('settings-saved').textContent = '';
+    const packageDiscount = { one: { standard: 0, preferred: 0 }, all: { standard: 0, preferred: 0 } };
+    for (const k of DISCOUNTS) for (const t of TIER_KEYS) {
+      const raw = $<HTMLInputElement>(`d-${k}-${t}`).value.trim();
+      const cents = raw ? toCents(raw) : 0;
+      if (cents === null) {
+        $('settings-error').textContent = 'Escribe los descuentos como 40 o 40.50.';
+        return;
+      }
+      packageDiscount[k][t] = cents;
+    }
     try {
-      const { settings } = await api<{ settings: { ordersWhatsApp: string } }>('/admin/settings', {
+      const { settings } = await api<{ settings: Settings }>('/admin/settings', {
         method: 'PUT',
-        json: { ordersWhatsApp: $<HTMLInputElement>('s-whatsapp').value },
+        json: { ordersWhatsApp: $<HTMLInputElement>('s-whatsapp').value, packageDiscount },
       });
-      $<HTMLInputElement>('s-whatsapp').value = settings.ordersWhatsApp;
+      showSettings(settings);
       $('settings-saved').textContent = 'Guardado.';
+      await loadPackages();
     } catch (e2) {
       $('settings-error').textContent = errorText(e2);
     }
@@ -531,7 +563,7 @@ import Base from '../layouts/Base.astro';
         location.replace('/inicio');
         return;
       }
-      await Promise.all([loadProducts(), loadUsers(), loadSettings()]);
+      await Promise.all([loadProducts(), loadUsers(), loadSettings(), loadPackages(me)]);
       $('page-status').hidden = true;
       $('main').hidden = false;
     } catch (e) {

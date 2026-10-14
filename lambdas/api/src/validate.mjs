@@ -1,7 +1,9 @@
 // Input checks for the admin API. Each function returns { value } with the
 // cleaned-up record, or { error } with a short Spanish message for the form.
 
-export const KINDS = ['mist', 'lotion', 'package', 'other'];
+export const KINDS = ['mist', 'lotion', 'other'];
+// Filled in when the size is left blank.
+export const DEFAULT_SIZE = { mist: '250 ml', lotion: '236 ml' };
 export const TIERS = ['preferred', 'standard'];
 const MAX_CENTS = 10_000_000; // $100,000.00
 const MAX_STOCK = 100_000;
@@ -21,7 +23,7 @@ export function slugify(text) {
 
 /**
  * input: the form's fields. existing: the stored record (null when new).
- * products: every product, to check package contents. now: ISO timestamp.
+ * products: every product (unused since paquetes became automatic). now: ISO timestamp.
  */
 export function validateProduct(id, input, { existing = null, products = [], now }) {
   if (!/^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/.test(id ?? '')) return { error: 'Identificador inválido.' };
@@ -31,7 +33,7 @@ export function validateProduct(id, input, { existing = null, products = [], now
   if (!KINDS.includes(kind)) return { error: 'Tipo de producto inválido.' };
   const scent = str(input.scent);
   if (scent.length > 40) return { error: 'La fragancia admite máximo 40 caracteres.' };
-  const size = str(input.size);
+  const size = str(input.size) || DEFAULT_SIZE[kind] || '';
   if (size.length > 20) return { error: 'El tamaño admite máximo 20 caracteres (por ejemplo 250 ml).' };
   const description = str(input.description);
   if (description.length > 400) return { error: 'La descripción admite máximo 400 caracteres.' };
@@ -42,7 +44,7 @@ export function validateProduct(id, input, { existing = null, products = [], now
     return { error: 'El precio Preferente no puede ser mayor que el Estándar.' };
   }
   const status = input.status === 'archived' ? 'archived' : 'active';
-  const sort = isInt(input.sort, 0, 9999) ? input.sort : 0;
+  const sort = isInt(input.sort, 0, 9999) ? input.sort : (existing?.sort ?? 0);
 
   const value = {
     id, type: 'product', kind, name, description, scent, size,
@@ -52,22 +54,11 @@ export function validateProduct(id, input, { existing = null, products = [], now
   if (existing?.photo) value.photo = existing.photo; // photos change only through upload
   value.createdAt = existing?.createdAt ?? now;
 
-  if (kind === 'package') {
-    const ids = Array.isArray(input.components) ? [...new Set(input.components.map(str))] : [];
-    if (ids.length < 2 || ids.length > 10) return { error: 'Un paquete incluye de 2 a 10 productos.' };
-    const byId = new Map(products.map((p) => [p.id, p]));
-    for (const c of ids) {
-      const p = byId.get(c);
-      if (!p || p.id === id) return { error: 'El paquete incluye un producto que no existe.' };
-      if (p.kind === 'package') return { error: 'Un paquete no puede incluir otro paquete.' };
-    }
-    value.components = ids;
-  } else {
-    if (!isInt(input.stock, 0, MAX_STOCK)) return { error: 'Las existencias deben ser un número entero.' };
-    value.stock = input.stock;
-    // Remember when an item ran out: after 60 days at zero it leaves the catalog.
-    if (input.stock === 0) value.outOfStockSince = existing?.stock === 0 && existing?.outOfStockSince ? existing.outOfStockSince : now;
-  }
+  // Paquetes are built automatically from same-scent lotions and mists.
+  if (!isInt(input.stock, 0, MAX_STOCK)) return { error: 'Las existencias deben ser un número entero.' };
+  value.stock = input.stock;
+  // Remember when an item ran out: after 60 days at zero it leaves the catalog.
+  if (input.stock === 0) value.outOfStockSince = existing?.stock === 0 && existing?.outOfStockSince ? existing.outOfStockSince : now;
   return { value };
 }
 
@@ -96,11 +87,24 @@ export function normalizePhone(raw) {
 }
 
 export function validateSettings(input, { now }) {
-  const ordersWhatsApp = normalizePhone(input.ordersWhatsApp);
-  if (!ordersWhatsApp) {
+  // The WhatsApp number may stay empty until orders are set up.
+  const raw = str(input.ordersWhatsApp);
+  const ordersWhatsApp = raw ? normalizePhone(raw) : '';
+  if (ordersWhatsApp === null) {
     return { error: 'Escribe el número con + y código de país, por ejemplo +52 55 1234 5678.' };
   }
-  return { value: { ordersWhatsApp, updatedAt: now } };
+  // Paquete discounts, in cents, per kind of paquete and per tier.
+  const packageDiscount = {};
+  for (const kind of ['one', 'all']) {
+    const d = input.packageDiscount?.[kind] ?? {};
+    packageDiscount[kind] = {};
+    for (const tier of TIERS) {
+      const v = d[tier] ?? 0;
+      if (!isInt(v, 0, MAX_CENTS)) return { error: 'Los descuentos deben ser cantidades válidas.' };
+      packageDiscount[kind][tier] = v;
+    }
+  }
+  return { value: { ordersWhatsApp, packageDiscount, updatedAt: now } };
 }
 
 /** Photos arrive already resized by the browser. Accept only real WebP or JPEG. */

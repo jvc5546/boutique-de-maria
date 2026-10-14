@@ -94,6 +94,19 @@ import Base from '../layouts/Base.astro';
     } else {
       el.append(h('span', 'ph', p.scent || p.name));
     }
+    // Paquetes: the lotion fills the photo; each mist inside sits small in the corner.
+    const minis = p.components.filter((c) => c.kind !== 'lotion' && c.photo);
+    if (p.kind === 'package' && minis.length) {
+      el.append(
+        h('div', 'minis', ...minis.map((c) => {
+          const img = document.createElement('img');
+          img.src = c.photo;
+          img.alt = c.name;
+          img.loading = eager ? 'eager' : 'lazy';
+          return h('span', 'mini', img);
+        })),
+      );
+    }
     // Only scarce or sold-out items get a badge on the photo; plenty is the norm.
     if (p.availability !== 'in') el.append(h('span', `tag ${p.availability}`, p.availability === 'out' ? 'Agotado' : 'Pocas piezas'));
     return el;

@@ -299,6 +299,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 6%; mix-blend-mode: multiply; display: block; }
 .photo .ph { font: italic 600 1.5rem var(--font-display); color: var(--muted); text-align: center; padding: 0 16px; }
 .photo .tag { position: absolute; top: 12px; left: 12px; }
+/* Paquete: small photos of the mists inside, bottom-right over the lotion. */
+.photo .minis { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+.photo .mini {
+  position: relative;
+  width: clamp(44px, 28%, 96px);
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 2px solid var(--surface);
+  box-shadow: 0 2px 8px rgb(31 26 29 / 0.12);
+  overflow: hidden;
+}
+.photo .minis .mini { width: clamp(40px, 9vw, 96px); }
+.sheet .photo .minis .mini { width: clamp(64px, 22vw, 120px); }
+.photo .mini img { padding: 4%; }
 
 .tag {
   display: inline-block;
@@ -440,7 +455,11 @@ input[type='checkbox'], input[type='radio'] { width: 20px; height: 20px; min-hei
 .stock.out { background: var(--out-soft); color: var(--out); }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; max-width: 34rem; display: grid; gap: 8px; }
-.panel label { font-weight: 700; }
+.panel > label { font-weight: 700; }
+.panel-title { font-size: 1.15rem; margin-top: 14px; }
+.panel.packages { margin-top: 16px; max-width: 48rem; }
+.panel.packages .panel-title { margin-top: 0; }
+#tab-settings .panel + .panel { margin-top: 16px; }
 .saved { color: var(--ok); font-weight: 600; font-size: 0.9rem; }
 
 dialog:not(.sheet) {

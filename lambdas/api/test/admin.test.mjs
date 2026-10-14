@@ -62,16 +62,26 @@ test('create a product: id from the name, accents removed, unique', async () => 
   assert.equal(db.products.length, 4);
 });
 
-test('package rules: 2+ existing items, no nested packages, no own stock', async () => {
+test('paquetes cannot be created by hand; size defaults by type', async () => {
   const { handler } = setup();
-  const pkg = { name: 'Paquete Vainilla', kind: 'package', scent: 'Vainilla', priceStandard: 20000, pricePreferred: 17000, components: ['bruma-vainilla', 'locion-vainilla'], stock: 99 };
-  const ok = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: pkg });
+  const pkg = { ...newMist, kind: 'package', components: ['bruma-vainilla', 'locion-vainilla'] };
+  assert.equal((await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: pkg })).status, 400);
+  const mist = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: newMist });
+  assert.equal(mist.body.product.size, '250 ml');
+  const lotion = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...newMist, kind: 'lotion' } });
+  assert.equal(lotion.body.product.size, '236 ml');
+});
+
+test('settings: paquete discounts per kind and tier; WhatsApp may be empty', async () => {
+  const { handler, db } = setup();
+  const body = { ordersWhatsApp: '', packageDiscount: { one: { standard: 4000, preferred: 3000 }, all: { standard: 9000 } } };
+  const ok = await call(handler, 'PUT /api/admin/settings', 'jona@example.com', { body });
   assert.equal(ok.status, 200);
-  assert.equal(ok.body.product.stock, undefined);
-  const one = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...pkg, components: ['bruma-vainilla'] } });
-  assert.equal(one.status, 400);
-  const nested = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...pkg, components: ['bruma-vainilla', 'paquete-vainilla'] } });
-  assert.equal(nested.status, 400);
+  assert.deepEqual(db.settings.packageDiscount, { one: { preferred: 3000, standard: 4000 }, all: { preferred: 0, standard: 9000 } });
+  const bad = await call(handler, 'PUT /api/admin/settings', 'jona@example.com', { body: { packageDiscount: { one: { standard: -1 } } } });
+  assert.equal(bad.status, 400);
+  const got = await call(handler, 'GET /api/admin/settings', 'jona@example.com');
+  assert.equal(got.body.settings.packageDiscount.all.standard, 9000);
 });
 
 test('preferred price cannot exceed standard', async () => {
@@ -147,7 +157,7 @@ test('size is optional, trimmed, and limited to 20 characters', async () => {
   assert.equal(a.body.product.size, '250 ml');
   const b = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...newMist, size: 'x'.repeat(21) } });
   assert.equal(b.status, 400);
-  const c = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: newMist });
+  const c = await call(handler, 'POST /api/admin/products', 'jona@example.com', { body: { ...newMist, kind: 'other' } });
   assert.equal(c.body.product.size, '');
 });
 

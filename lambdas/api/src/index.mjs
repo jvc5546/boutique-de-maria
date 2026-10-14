@@ -8,7 +8,7 @@
 // page, so the API answers 401 for "not allowed" (no-invitado / solo-admin)
 // and 400 for anything wrong with the request.
 
-import { buildCatalog, isListed } from './catalog.mjs';
+import { buildCatalog, discounts, isListed } from './catalog.mjs';
 import { slugify, validatePhoto, validateProduct, validateSettings, validateUser } from './validate.mjs';
 
 export function makeHandler(db, clock = () => new Date()) {
@@ -27,7 +27,7 @@ export function makeHandler(db, clock = () => new Date()) {
       return json(200, {
         user: { name: user.name ?? '', role: user.role, tier: user.tier ?? '' },
         settings: { ordersWhatsApp: settings?.ordersWhatsApp ?? '' },
-        products: buildCatalog(records, user, Date.parse(now)),
+        products: buildCatalog(records, user, Date.parse(now), settings),
       });
     }
 
@@ -53,7 +53,9 @@ export function makeHandler(db, clock = () => new Date()) {
     switch (route) {
       case 'GET /api/admin/products': {
         const now_ = Date.parse(now);
+        // Old hand-made package records are left out: paquetes are automatic now.
         const products = (await db.listProducts())
+          .filter((p) => p.kind !== 'package')
           .map((p) => ({ ...p, listed: isListed(p, now_) }))
           .sort((a, b) => (a.scent ?? '').localeCompare(b.scent ?? '', 'es') || (a.sort ?? 0) - (b.sort ?? 0));
         return json(200, { products });
@@ -124,7 +126,10 @@ export function makeHandler(db, clock = () => new Date()) {
       }
 
       case 'GET /api/admin/settings':
-        return json(200, { settings: (await db.getSettings()) ?? { ordersWhatsApp: '' } });
+      {
+        const s = await db.getSettings();
+        return json(200, { settings: { ordersWhatsApp: s?.ordersWhatsApp ?? '', packageDiscount: discounts(s) } });
+      }
 
       case 'PUT /api/admin/settings': {
         const { value, error } = validateSettings(body, { now });
