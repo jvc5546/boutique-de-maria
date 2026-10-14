@@ -144,3 +144,13 @@ test('plain() converts DynamoDB JSON', () => {
     { a: 'x', n: 12000, l: ['p'], b: true },
   );
 });
+
+test('sections: products carry their section; only sections with products are listed', async () => {
+  const res = await handler(ev('GET /api/catalog', 'jona@example.com'));
+  const body = JSON.parse(res.body);
+  assert.deepEqual(body.departments.map((d) => d.id), ['lociones']);
+  assert.ok(body.products.every((p) => p.department === 'lociones'));
+  const withTest = buildCatalog([...records, P('t1', { kind: 'test', name: 'Test 1 rojo', stock: 3 })], standard);
+  assert.equal(find(withTest, 't1').department, 'prueba');
+  assert.equal(find(withTest, 't1').related.length, 0);
+});

@@ -1,7 +1,8 @@
 // Input checks for the admin API. Each function returns { value } with the
 // cleaned-up record, or { error } with a short Spanish message for the form.
 
-export const KINDS = ['mist', 'lotion', 'other'];
+import { KINDS } from './departments.mjs';
+export { KINDS };
 // Filled in when the size is left blank.
 export const DEFAULT_SIZE = { mist: '250 ml', lotion: '236 ml' };
 export const TIERS = ['preferred', 'standard'];

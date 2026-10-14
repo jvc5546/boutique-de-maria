@@ -38,6 +38,7 @@ import Base from '../layouts/Base.astro';
 
     <!-- Productos -->
     <section id="tab-products">
+      <nav class="depts inline" id="dept-switch" aria-label="Sección" hidden></nav>
       <div class="toolbar">
         <label class="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
@@ -109,13 +110,9 @@ import Base from '../layouts/Base.astro';
         </div>
         <div class="field">
           <label for="p-kind">Tipo</label>
-          <select id="p-kind" name="kind">
-            <option value="mist">Mist</option>
-            <option value="lotion">Loción</option>
-            <option value="other">Otro</option>
-          </select>
+          <select id="p-kind" name="kind"></select>
         </div>
-        <div class="field">
+        <div class="field" id="scent-field">
           <label for="p-scent">Fragancia</label>
           <input id="p-scent" name="scent" maxlength="40" list="scents" />
           <datalist id="scents"></datalist>
@@ -198,11 +195,14 @@ import Base from '../layouts/Base.astro';
 <script>
   import { requireUser } from '../lib/auth';
   import { setupAccountMenu, showAccount } from '../lib/menu';
-  import { api, ApiError, money, toCents, type AdminProduct, type AdminUser, type Catalog } from '../lib/api';
+  import { api, ApiError, money, toCents, type AdminProduct, type AdminUser, type Catalog, type Department } from '../lib/api';
   import { matches } from '../lib/search';
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-  const KIND: Record<string, string> = { mist: 'Mist', lotion: 'Loción', package: 'Paquete', other: 'Otro' };
+  // Product type labels, filled in from the sections the API sends.
+  const KIND: Record<string, string> = { package: 'Paquete' };
+  let departments: Department[] = [];
+  let dept: Department | null = null; // section shown in Productos
 
   function h(tag: string, cls = '', ...children: (Node | string | null)[]) {
     const el = document.createElement(tag);
@@ -239,11 +239,14 @@ import Base from '../layouts/Base.astro';
 
   function renderProducts() {
     const q = $<HTMLInputElement>('product-search').value || '';
-    const shown = products.filter((p) => matches(q, p.name, p.scent, p.size, KIND[p.kind]));
+    const inDept = products.filter((p) => !dept || p.department === dept.id);
+    const shown = inDept.filter((p) => matches(q, p.name, p.scent, p.size, KIND[p.kind]));
     // Grouped by fragrance (like the catalog): loción first, then mists, then the rest.
     const ORDER: Record<string, number> = { lotion: 0, mist: 1 };
     const byScent = new Map<string, AdminProduct[]>();
-    for (const p of shown) byScent.set(p.scent ?? '', [...(byScent.get(p.scent ?? '') ?? []), p]);
+    // Sections without fragrances are one plain list.
+    const key = (p: AdminProduct) => (dept?.scent ? p.scent ?? '' : '');
+    for (const p of shown) byScent.set(key(p), [...(byScent.get(key(p)) ?? []), p]);
     const scents = [...byScent.keys()].sort((a, b) => (!a ? 1 : !b ? -1 : a.localeCompare(b, 'es')));
 
     const row = (p: AdminProduct) => {
@@ -287,21 +290,39 @@ import Base from '../layouts/Base.astro';
         add.setAttribute('aria-label', `Agregar producto a ${scent || 'Sin fragancia'}`);
         add.addEventListener('click', () => openProduct(null, scent));
         return h('section', 'admin-group',
-          h('div', 'admin-group-head',
-            h('h2', '', scent || 'Sin fragancia'),
-            h('span', 'muted', `${list.length} ${list.length === 1 ? 'producto' : 'productos'}`),
-            scent ? add : null,
-          ),
+          dept?.scent
+            ? h('div', 'admin-group-head',
+                h('h2', '', scent || 'Sin fragancia'),
+                h('span', 'muted', `${list.length} ${list.length === 1 ? 'producto' : 'productos'}`),
+                scent ? add : null,
+              )
+            : null,
           h('ul', 'rows', ...list.map(row)),
         );
       }),
     );
     $('products-status').hidden = shown.length > 0;
-    $('products-status').textContent = products.length ? 'Ningún producto coincide.' : 'Aún no hay productos.';
+    $('products-status').textContent = inDept.length ? 'Ningún producto coincide.' : 'Aún no hay productos en esta sección.';
   }
 
   async function loadProducts() {
-    products = (await api<{ products: AdminProduct[] }>('/admin/products')).products;
+    const res = await api<{ products: AdminProduct[]; departments: Department[] }>('/admin/products');
+    products = res.products;
+    if (!departments.length) {
+      departments = res.departments ?? [];
+      for (const d of departments) for (const [k, [one]] of Object.entries(d.kinds)) KIND[k] = one;
+      const sw = $('dept-switch');
+      sw.hidden = departments.length < 2;
+      sw.replaceChildren(
+        ...departments.map((d) => {
+          const b = h('button', 'dept-tab', d.name) as HTMLButtonElement;
+          b.type = 'button';
+          b.dataset.dept = d.id;
+          return b;
+        }),
+      );
+      setDept(new URLSearchParams(location.search).get('seccion') ?? '');
+    }
     $('scents').replaceChildren(
       ...[...new Set(products.map((p) => p.scent).filter(Boolean))].map((s) => {
         const o = document.createElement('option'); o.value = s!; return o;
@@ -309,6 +330,25 @@ import Base from '../layouts/Base.astro';
     );
     renderProducts();
   }
+
+  // Switch section: the list, search and "+ Nuevo producto" follow it.
+  function setDept(id: string) {
+    dept = departments.find((d) => d.id === id) ?? departments[0] ?? null;
+    for (const b of $('dept-switch').querySelectorAll<HTMLElement>('[data-dept]')) {
+      b.setAttribute('aria-pressed', String(b.dataset.dept === dept?.id));
+    }
+    $<HTMLInputElement>('product-search').placeholder = dept?.scent ? 'Buscar por nombre o fragancia' : 'Buscar por nombre';
+    const url = new URL(location.href);
+    if (dept && dept.id !== departments[0]?.id) url.searchParams.set('seccion', dept.id);
+    else url.searchParams.delete('seccion');
+    history.replaceState(null, '', url.pathname + url.search);
+    const back = document.querySelector<HTMLAnchorElement>('.nav-btn[href^="/inicio"]');
+    if (back) back.href = `/inicio${url.search}`;
+  }
+  $('dept-switch').addEventListener('click', (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>('[data-dept]');
+    if (t) { setDept(t.dataset.dept!); renderProducts(); }
+  });
 
   $('product-search').addEventListener('input', renderProducts);
   $('product-new').addEventListener('click', () => openProduct(null));
@@ -332,7 +372,15 @@ import Base from '../layouts/Base.astro';
     $('product-error').textContent = '';
     const val = (id: string, v: string) => ($<HTMLInputElement>(id).value = v);
     val('p-name', p?.name ?? '');
-    val('p-kind', p?.kind ?? 'mist');
+    // Tipo: this section's types (an existing product keeps its own section's).
+    const d = (p && departments.find((x) => p.kind in x.kinds)) || dept;
+    $('p-kind').replaceChildren(
+      ...Object.entries(d?.kinds ?? {}).map(([k, [one]]) => {
+        const o = document.createElement('option'); o.value = k; o.textContent = one; return o;
+      }),
+    );
+    $('scent-field').hidden = !d?.scent;
+    val('p-kind', p?.kind ?? Object.keys(d?.kinds ?? {})[0] ?? '');
     val('p-scent', p?.scent ?? scent);
     val('p-size', p?.size ?? '');
     val('p-description', p?.description ?? '');

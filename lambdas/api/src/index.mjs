@@ -8,7 +8,8 @@
 // page, so the API answers 401 for "not allowed" (no-invitado / solo-admin)
 // and 400 for anything wrong with the request.
 
-import { buildCatalog, discounts, isListed } from './catalog.mjs';
+import { buildCatalog, departmentsFor, discounts, isListed } from './catalog.mjs';
+import { departmentOf } from './departments.mjs';
 import { slugify, validatePhoto, validateProduct, validateSettings, validateUser } from './validate.mjs';
 
 export function makeHandler(db, clock = () => new Date()) {
@@ -24,10 +25,12 @@ export function makeHandler(db, clock = () => new Date()) {
 
     if (route === 'GET /api/catalog') {
       const [records, settings] = await Promise.all([db.listProducts(), db.getSettings()]);
+      const products = buildCatalog(records, user, Date.parse(now), settings);
       return json(200, {
         user: { name: user.name ?? '', role: user.role, tier: user.tier ?? '' },
         settings: { ordersWhatsApp: settings?.ordersWhatsApp ?? '' },
-        products: buildCatalog(records, user, Date.parse(now), settings),
+        departments: departmentsFor(products),
+        products,
       });
     }
 
@@ -56,9 +59,9 @@ export function makeHandler(db, clock = () => new Date()) {
         // Old hand-made package records are left out: paquetes are automatic now.
         const products = (await db.listProducts())
           .filter((p) => p.kind !== 'package')
-          .map((p) => ({ ...p, listed: isListed(p, now_) }))
+          .map((p) => ({ ...p, department: departmentOf(p.kind), listed: isListed(p, now_) }))
           .sort((a, b) => (a.scent ?? '').localeCompare(b.scent ?? '', 'es') || (a.sort ?? 0) - (b.sort ?? 0));
-        return json(200, { products });
+        return json(200, { products, departments: departmentsFor([], { all: true }) });
       }
 
       case 'POST /api/admin/products': {

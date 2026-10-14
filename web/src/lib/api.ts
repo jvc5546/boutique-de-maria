@@ -53,9 +53,19 @@ function goTo(to: string): Promise<never> {
 
 export type Kind = 'mist' | 'lotion' | 'package' | string;
 
+/** A store section, defined in lambdas/api/src/departments.mjs. */
+export interface Department {
+  id: string;
+  name: string;
+  kinds: Record<string, [string, string]>; // kind -> [singular, plural]
+  scent: boolean;
+  packages: boolean;
+}
+
 export interface Product {
   id: string;
   kind: Kind;
+  department: string;
   name: string;
   description: string;
   scent: string;
@@ -72,6 +82,7 @@ export interface Product {
 export interface Catalog {
   user: { name: string; role: 'admin' | 'distributor'; tier: string };
   settings: { ordersWhatsApp: string };
+  departments: Department[];
   products: Product[];
 }
 
@@ -91,6 +102,7 @@ export interface AdminProduct {
   sort?: number;
   photo?: string;
   outOfStockSince?: string;
+  department?: string;
   listed?: boolean; // false when archived, or 60+ days out of stock
 }
 

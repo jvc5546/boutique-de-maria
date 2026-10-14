@@ -22,6 +22,8 @@
 //   - An item at zero stock for 60 days leaves the catalog on its own
 //     (as if archived); restocking it brings it back.
 
+import { DEPARTMENTS, departmentOf } from './departments.mjs';
+
 export const LOW_STOCK = 3;
 export const STALE_DAYS = 60;
 
@@ -104,6 +106,7 @@ export function buildCatalog(records, user, now = Date.now(), settings = null) {
     const out = {
       id: p.id,
       kind: p.kind,
+      department: departmentOf(p.kind),
       name: p.name,
       description: p.description ?? '',
       scent: p.scent ?? '',
@@ -131,6 +134,12 @@ export function buildCatalog(records, user, now = Date.now(), settings = null) {
       a.name.localeCompare(b.name, 'es'),
   );
   return products;
+}
+
+/** Sections to show: in registry order; only the ones with products unless `all`. */
+export function departmentsFor(products, { all = false } = {}) {
+  const used = new Set(products.map((p) => p.department ?? departmentOf(p.kind)));
+  return DEPARTMENTS.filter((d) => all || used.has(d.id)).map(({ id, name, kinds, scent, packages }) => ({ id, name, kinds, scent, packages }));
 }
 
 export function priceFor(product, user) {

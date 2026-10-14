@@ -8,6 +8,7 @@ import Base from '../layouts/Base.astro';
 <Base title="Catálogo · Boutique de María">
   <header class="bar">
     <a class="brand" href="/inicio">Boutique de María</a>
+    <nav class="depts" id="depts" aria-label="Secciones" hidden></nav>
     <div class="who">
       <a class="btn ghost small nav-btn" id="admin-link" href="/admin" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>Administrar</a>
       <div class="account">
@@ -40,16 +41,12 @@ import Base from '../layouts/Base.astro';
         <span class="sr">Buscar</span>
         <input id="search" type="search" placeholder="Buscar fragancia o producto" autocomplete="off" enterkeyhint="search" />
       </label>
-      <nav class="chips" id="filters" aria-label="Filtrar por tipo">
-        <button type="button" data-kind="" aria-pressed="true">Todo</button>
-        <button type="button" data-kind="mist" aria-pressed="false">Mists</button>
-        <button type="button" data-kind="lotion" aria-pressed="false">Lociones</button>
-        <button type="button" data-kind="package" aria-pressed="false">Paquetes</button>
-      </nav>
+      <nav class="chips" id="filters" aria-label="Filtrar por tipo"></nav>
     </div>
 
     <p class="status" id="status" role="status">Cargando catálogo…</p>
     <div id="groups"></div>
+    <div class="elsewhere" id="elsewhere" hidden></div>
   </main>
 
   <dialog class="sheet" id="sheet" aria-labelledby="sheet-name">
@@ -62,15 +59,18 @@ import Base from '../layouts/Base.astro';
 <script>
   import { requireUser } from '../lib/auth';
   import { setupAccountMenu, showAccount } from '../lib/menu';
-  import { api, money, type Catalog, type Product } from '../lib/api';
+  import { api, money, type Catalog, type Department, type Product } from '../lib/api';
   import { matches } from '../lib/search';
 
-  const KIND: Record<string, string> = { mist: 'Mist', lotion: 'Loción', package: 'Paquete' };
+  // Product type labels, filled in from the sections the API sends.
+  const KIND: Record<string, string> = { package: 'Paquete' };
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   const status = $('status');
   const groups = $('groups');
   const sheet = $<HTMLDialogElement>('sheet');
   let products: Product[] = [];
+  let departments: Department[] = [];
+  let dept: Department | null = null; // the section being shown
   let isAdmin = false;
   let kind = '';
   let query = '';
@@ -154,23 +154,105 @@ import Base from '../layouts/Base.astro';
     return el;
   }
 
+  const hit = (p: Product, q: string) => matches(q, p.name, p.scent, p.size, p.description, KIND[p.kind]);
+
   function render() {
     const q = query.trim();
-    const shown = products.filter(
-      (p) => (!kind || p.kind === kind) && matches(q, p.name, p.scent, p.size, p.description, KIND[p.kind]),
-    );
+    const here = products.filter((p) => p.department === dept?.id);
+    const shown = here.filter((p) => (!kind || p.kind === kind) && hit(p, q));
     groups.replaceChildren();
     status.hidden = shown.length > 0;
     if (!shown.length) {
-      status.textContent = q ? `Nada coincide con “${q}”.` : 'No hay productos en esta sección todavía.';
+      status.textContent = q
+        ? `Nada en ${dept?.name ?? 'esta sección'} coincide con “${q}”.`
+        : 'No hay productos en esta sección todavía.';
     }
 
-    const byScent = new Map<string, Product[]>();
-    for (const p of shown) byScent.set(p.scent, [...(byScent.get(p.scent) ?? []), p]);
-    for (const [scent, list] of byScent) {
-      groups.append(h('section', 'group', h('h2', '', scent || 'Otros'), h('div', 'grid', ...list.map(card))));
+    // Fragrance sections group by scent; others are one grid.
+    if (dept?.scent) {
+      const byScent = new Map<string, Product[]>();
+      for (const p of shown) byScent.set(p.scent, [...(byScent.get(p.scent) ?? []), p]);
+      for (const [scent, list] of byScent) {
+        groups.append(h('section', 'group', h('h2', '', scent || 'Otros'), h('div', 'grid', ...list.map(card))));
+      }
+    } else if (shown.length) {
+      groups.append(h('section', 'group', h('div', 'grid', ...shown.map(card))));
     }
+
+    // Search: results stay in this section; other sections with matches are offered below.
+    const box = $('elsewhere');
+    const others = q
+      ? departments
+          .filter((d) => d.id !== dept?.id)
+          .map((d) => ({ d, n: products.filter((p) => p.department === d.id && hit(p, q)).length }))
+          .filter((x) => x.n > 0)
+      : [];
+    box.hidden = others.length === 0;
+    box.replaceChildren(
+      ...others.map(({ d, n }) => {
+        const b = h('button', 'link', `También hay ${n} ${n === 1 ? 'resultado' : 'resultados'} en ${d.name} →`) as HTMLButtonElement;
+        b.type = 'button';
+        b.addEventListener('click', () => showDept(d.id));
+        return b;
+      }),
+    );
   }
+
+  // ---- Sections ----
+
+  function buildFilters() {
+    const here = products.filter((p) => p.department === dept?.id);
+    const kinds = Object.entries(dept?.kinds ?? {}).filter(([k]) => here.some((p) => p.kind === k));
+    const chips: [string, string][] = [['', 'Todo'], ...kinds.map(([k, names]): [string, string] => [k, names[1]])];
+    if (here.some((p) => p.kind === 'package')) chips.push(['package', 'Paquetes']);
+    $('filters').replaceChildren(
+      ...chips.map(([k, label]) => {
+        const b = h('button', '', label) as HTMLButtonElement;
+        b.type = 'button';
+        b.dataset.kind = k;
+        b.setAttribute('aria-pressed', String(k === kind));
+        return b;
+      }),
+    );
+    // Only show filters when there's more than one kind to choose from.
+    $('filters').hidden = chips.length <= 2;
+  }
+
+  function showDept(id: string, { keepScroll = false } = {}) {
+    dept = departments.find((d) => d.id === id) ?? departments[0] ?? null;
+    kind = '';
+    for (const t of $('depts').querySelectorAll<HTMLElement>('[data-dept]')) {
+      if (t.dataset.dept === dept?.id) t.setAttribute('aria-current', 'page');
+      else t.removeAttribute('aria-current');
+    }
+    $<HTMLInputElement>('search').placeholder = dept?.scent ? 'Buscar fragancia o producto' : 'Buscar producto';
+    $<HTMLAnchorElement>('admin-link').href = `/admin${dept ? `?seccion=${dept.id}` : ''}`;
+    const url = new URL(location.href);
+    if (dept && dept.id !== departments[0]?.id) url.searchParams.set('seccion', dept.id);
+    else url.searchParams.delete('seccion');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    buildFilters();
+    render();
+    if (!keepScroll) window.scrollTo({ top: 0 });
+  }
+
+  // One tab per section; hidden while the store has only one.
+  function buildTabs() {
+    const nav = $('depts');
+    nav.hidden = departments.length < 2;
+    nav.replaceChildren(
+      ...departments.map((d) => {
+        const b = h('button', 'dept-tab', d.name) as HTMLButtonElement;
+        b.type = 'button';
+        b.dataset.dept = d.id;
+        return b;
+      }),
+    );
+  }
+  $('depts').addEventListener('click', (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>('[data-dept]');
+    if (t && t.dataset.dept !== dept?.id) showDept(t.dataset.dept!);
+  });
 
   // ---- Product sheet ----
 
@@ -244,6 +326,7 @@ import Base from '../layouts/Base.astro';
   function openSheet(id: string) {
     const p = products.find((x) => x.id === id);
     if (!p) return;
+    if (p.department !== dept?.id) showDept(p.department, { keepScroll: true });
     const box = $('sheet-photo');
     box.classList.toggle('is-gallery', p.kind === 'package' && p.components.length > 1);
     if (p.kind === 'package' && p.components.length > 1) gallery(p, box);
@@ -285,7 +368,7 @@ import Base from '../layouts/Base.astro';
   function closeSheet() {
     sheet.close();
   }
-  sheet.addEventListener('close', () => history.replaceState(null, '', location.pathname));
+  sheet.addEventListener('close', () => history.replaceState(null, '', location.pathname + location.search));
   $('sheet-close').addEventListener('click', closeSheet);
   // Tap on the dimmed backdrop closes it.
   sheet.addEventListener('click', (e) => {
@@ -324,12 +407,15 @@ import Base from '../layouts/Base.astro';
     try {
       const data = await api<Catalog>('/catalog');
       products = data.products;
+      departments = data.departments ?? [];
+      for (const d of departments) for (const [k, [one]] of Object.entries(d.kinds)) KIND[k] = one;
       isAdmin = data.user.role === 'admin';
       const first = data.user.name.split(' ')[0];
       if (first) $('greeting').textContent = `Hola, ${first}`;
       $('admin-link').hidden = !isAdmin;
       showAccount(data.user.name, isAdmin ? 'Administración' : data.user.tier === 'preferred' ? 'Nivel Preferente' : 'Nivel Estándar');
-      render();
+      buildTabs();
+      showDept(new URLSearchParams(location.search).get('seccion') ?? '', { keepScroll: true });
       const id = decodeURIComponent(location.hash.slice(1));
       if (id) openSheet(id);
     } catch {
