@@ -9,9 +9,21 @@ import Base from '../layouts/Base.astro';
   <header class="bar">
     <a class="brand" href="/inicio">Boutique de María</a>
     <div class="who">
-      <span class="badge small" id="who-badge"></span>
-      <a class="link" id="admin-link" href="/admin" hidden>Administrar</a>
-      <button class="link" id="signout" type="button">Salir</button>
+      <a class="btn ghost small nav-btn" id="admin-link" href="/admin" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>Administrar</a>
+      <div class="account">
+        <button class="account-btn" id="account-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu" aria-label="Mi cuenta">
+          <span class="avatar" id="account-initial" aria-hidden="true">·</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="account-menu" id="account-menu" hidden>
+          <p class="account-name" id="account-name"></p>
+          <p class="account-level" id="account-level"></p>
+          <button class="account-out" id="signout" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -48,7 +60,8 @@ import Base from '../layouts/Base.astro';
 </Base>
 
 <script>
-  import { requireUser, signOut } from '../lib/auth';
+  import { requireUser } from '../lib/auth';
+  import { setupAccountMenu, showAccount } from '../lib/menu';
   import { api, money, type Catalog, type Product } from '../lib/api';
   import { matches } from '../lib/search';
 
@@ -62,7 +75,7 @@ import Base from '../layouts/Base.astro';
   let kind = '';
   let query = '';
 
-  $('signout').addEventListener('click', signOut);
+  setupAccountMenu();
 
   // Tiny element builder: text always goes in as text, never as HTML.
   function h(tag: string, cls = '', ...children: (Node | string | null)[]) {
@@ -245,7 +258,7 @@ import Base from '../layouts/Base.astro';
       const first = data.user.name.split(' ')[0];
       if (first) $('greeting').textContent = `Hola, ${first}`;
       $('admin-link').hidden = !isAdmin;
-      $('who-badge').textContent = isAdmin ? 'Admin' : data.user.tier === 'preferred' ? 'Preferente' : 'Estándar';
+      showAccount(data.user.name, isAdmin ? 'Administración' : data.user.tier === 'preferred' ? 'Nivel Preferente' : 'Nivel Estándar');
       render();
       const id = decodeURIComponent(location.hash.slice(1));
       if (id) openSheet(id);
