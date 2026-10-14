@@ -73,7 +73,7 @@ import Base from '../layouts/Base.astro';
         <div class="field">
           <label for="p-kind">Tipo</label>
           <select id="p-kind" name="kind">
-            <option value="mist">Bruma</option>
+            <option value="mist">Mist</option>
             <option value="lotion">Loción</option>
             <option value="package">Paquete</option>
             <option value="other">Otro</option>
@@ -173,7 +173,7 @@ import Base from '../layouts/Base.astro';
   import { matches } from '../lib/search';
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-  const KIND: Record<string, string> = { mist: 'Bruma', lotion: 'Loción', package: 'Paquete', other: 'Otro' };
+  const KIND: Record<string, string> = { mist: 'Mist', lotion: 'Loción', package: 'Paquete', other: 'Otro' };
 
   function h(tag: string, cls = '', ...children: (Node | string | null)[]) {
     const el = document.createElement(tag);

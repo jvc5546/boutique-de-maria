@@ -60,7 +60,7 @@ export function makeHandler(db, clock = () => new Date()) {
       }
 
       case 'POST /api/admin/products': {
-        // New product: the id comes from the name (Bruma Vainilla -> bruma-vainilla).
+        // New product: the id comes from the name (Mist Vainilla -> mist-vainilla).
         const products = await db.listProducts();
         const taken = new Set(products.map((p) => p.id));
         const base = slugify(body.name) || 'producto';

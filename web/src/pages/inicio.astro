@@ -18,7 +18,7 @@ import Base from '../layouts/Base.astro';
   <main class="catalog">
     <div class="catalog-head">
       <p class="kicker">Catálogo privado</p>
-      <h1 id="greeting">Brumas y lociones</h1>
+      <h1 id="greeting">Mists y lociones</h1>
     </div>
 
     <div id="sentinel" aria-hidden="true"></div>
@@ -30,7 +30,7 @@ import Base from '../layouts/Base.astro';
       </label>
       <nav class="chips" id="filters" aria-label="Filtrar por tipo">
         <button type="button" data-kind="" aria-pressed="true">Todo</button>
-        <button type="button" data-kind="mist" aria-pressed="false">Brumas</button>
+        <button type="button" data-kind="mist" aria-pressed="false">Mists</button>
         <button type="button" data-kind="lotion" aria-pressed="false">Lociones</button>
         <button type="button" data-kind="package" aria-pressed="false">Paquetes</button>
       </nav>
@@ -52,7 +52,7 @@ import Base from '../layouts/Base.astro';
   import { api, money, type Catalog, type Product } from '../lib/api';
   import { matches } from '../lib/search';
 
-  const KIND: Record<string, string> = { mist: 'Bruma', lotion: 'Loción', package: 'Paquete' };
+  const KIND: Record<string, string> = { mist: 'Mist', lotion: 'Loción', package: 'Paquete' };
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   const status = $('status');
   const groups = $('groups');
