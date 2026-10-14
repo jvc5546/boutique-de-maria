@@ -31,6 +31,8 @@ export function validateProduct(id, input, { existing = null, products = [], now
   if (!KINDS.includes(kind)) return { error: 'Tipo de producto inválido.' };
   const scent = str(input.scent);
   if (scent.length > 40) return { error: 'La fragancia admite máximo 40 caracteres.' };
+  const size = str(input.size);
+  if (size.length > 20) return { error: 'El tamaño admite máximo 20 caracteres (por ejemplo 250 ml).' };
   const description = str(input.description);
   if (description.length > 400) return { error: 'La descripción admite máximo 400 caracteres.' };
   for (const k of ['priceStandard', 'pricePreferred']) {
@@ -43,7 +45,7 @@ export function validateProduct(id, input, { existing = null, products = [], now
   const sort = isInt(input.sort, 0, 9999) ? input.sort : 0;
 
   const value = {
-    id, type: 'product', kind, name, description, scent,
+    id, type: 'product', kind, name, description, scent, size,
     priceStandard: input.priceStandard, pricePreferred: input.pricePreferred,
     status, sort, updatedAt: now,
   };
@@ -76,7 +78,8 @@ export function validateUser(email, input, { existing = null, now }) {
   const name = str(input.name);
   if (!name || name.length > 60) return { error: 'El nombre es obligatorio (máximo 60 caracteres).' };
   if (!TIERS.includes(input.tier)) return { error: 'Nivel inválido.' };
-  const status = input.status === 'removed' ? 'removed' : 'active';
+  // Everyone on the list can enter; to keep someone out, delete them.
+  const status = 'active';
   return {
     value: {
       pk: `USER#${e}`, sk: 'PROFILE', type: 'user', email: e, name, role: 'distributor',

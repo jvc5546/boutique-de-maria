@@ -59,6 +59,7 @@ export interface Product {
   name: string;
   description: string;
   scent: string;
+  size: string; // "250 ml" or ""
   photo: string; // "/media/products/..." or ""
   price: number; // cents, MXN
   prices?: { standard: number; preferred: number }; // admins only
@@ -82,6 +83,7 @@ export interface AdminProduct {
   name: string;
   description?: string;
   scent?: string;
+  size?: string;
   priceStandard: number;
   pricePreferred: number;
   stock?: number;

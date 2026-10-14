@@ -112,6 +112,17 @@ export function makeHandler(db, clock = () => new Date()) {
         return json(200, { user: value });
       }
 
+      // Removing someone deletes their record: no record, no way in. Admins
+      // live in Terraform (ADMINS) and can't be deleted from here.
+      case 'DELETE /api/admin/users/{email}': {
+        const target = param('email').toLowerCase();
+        const existing = await db.getUser(target);
+        if (!existing) return json(400, { error: 'Ese correo no está en la lista.' });
+        if (existing.role === 'admin') return json(400, { error: 'Las cuentas de administración se cambian en Terraform.' });
+        await db.deleteUser(target);
+        return json(200, { deleted: target });
+      }
+
       case 'GET /api/admin/settings':
         return json(200, { settings: (await db.getSettings()) ?? { ordersWhatsApp: '' } });
 
@@ -211,6 +222,10 @@ const dynamoDb = {
       ExpressionAttributeValues: { ':t': { S: 'user' } },
     }),
   putUser: (user) => putItem(user),
+  deleteUser: async (email) => {
+    const { ddb, dynamo } = await aws();
+    await dynamo.send(new ddb.DeleteItemCommand({ TableName: TABLE(), Key: typed({ pk: `USER#${email}`, sk: 'PROFILE' }) }));
+  },
 
   listProducts: () =>
     queryAll({

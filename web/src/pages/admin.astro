@@ -26,7 +26,11 @@ import Base from '../layouts/Base.astro';
     <!-- Productos -->
     <section id="tab-products">
       <div class="toolbar">
-        <input id="product-search" type="search" placeholder="Buscar por nombre o fragancia" aria-label="Buscar productos" />
+        <label class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <span class="sr">Buscar productos</span>
+          <input id="product-search" type="search" placeholder="Buscar por nombre o fragancia" autocomplete="off" />
+        </label>
         <button class="btn" id="product-new" type="button">+ Nuevo producto</button>
       </div>
       <p class="status" id="products-status">Cargando…</p>
@@ -80,6 +84,10 @@ import Base from '../layouts/Base.astro';
           <input id="p-scent" name="scent" maxlength="40" list="scents" />
           <datalist id="scents"></datalist>
         </div>
+        <div class="field">
+          <label for="p-size">Tamaño</label>
+          <input id="p-size" name="size" maxlength="20" placeholder="250 ml" />
+        </div>
         <div class="field span2">
           <label for="p-description">Descripción</label>
           <textarea id="p-description" name="description" rows="3" maxlength="400"></textarea>
@@ -118,7 +126,7 @@ import Base from '../layouts/Base.astro';
             <div class="photo thumb" id="p-photo-preview"></div>
             <div>
               <input id="p-photo" type="file" accept="image/*" />
-              <p class="hint">Se recorta al centro en un cuadrado de 1200 px.</p>
+              <p class="hint">Se ajusta completa en un cuadrado blanco de 1200 px, sin recortar el producto.</p>
             </div>
           </div>
         </div>
@@ -147,15 +155,11 @@ import Base from '../layouts/Base.astro';
         <legend>Nivel</legend>
         <label class="radio"><input type="radio" name="tier" value="standard" id="u-tier-standard" checked /> Estándar</label>
         <label class="radio"><input type="radio" name="tier" value="preferred" id="u-tier-preferred" /> Preferente</label>
-        <p class="hint" id="u-tier-note" hidden>Sin acceso no ve precios. El nivel se guarda por si le devuelves el acceso.</p>
       </fieldset>
-      <fieldset class="field">
-        <legend>Acceso</legend>
-        <label class="radio"><input type="radio" name="status" value="active" id="u-status-active" checked /> Puede entrar</label>
-        <label class="radio"><input type="radio" name="status" value="removed" id="u-status-removed" /> Sin acceso</label>
-      </fieldset>
+      <p class="hint">Quien está en esta lista puede entrar con su cuenta de Google. Para quitarle el acceso, elimínalo.</p>
       <p class="form-error" id="user-error" role="alert"></p>
       <div class="actions">
+        <button class="btn ghost danger" type="button" id="user-delete" hidden>Eliminar</button>
         <button class="btn ghost" type="button" data-close>Cancelar</button>
         <button class="btn" type="submit">Guardar</button>
       </div>
@@ -166,6 +170,7 @@ import Base from '../layouts/Base.astro';
 <script>
   import { requireUser, signOut } from '../lib/auth';
   import { api, ApiError, money, toCents, type AdminProduct, type AdminUser, type Catalog } from '../lib/api';
+  import { matches } from '../lib/search';
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   const KIND: Record<string, string> = { mist: 'Bruma', lotion: 'Loción', package: 'Paquete', other: 'Otro' };
@@ -209,8 +214,8 @@ import Base from '../layouts/Base.astro';
   }
 
   function renderProducts() {
-    const q = ($<HTMLInputElement>('product-search').value || '').trim().toLowerCase();
-    const shown = products.filter((p) => !q || `${p.name} ${p.scent ?? ''}`.toLowerCase().includes(q));
+    const q = $<HTMLInputElement>('product-search').value || '';
+    const shown = products.filter((p) => matches(q, p.name, p.scent, p.size, KIND[p.kind]));
     const ul = $('product-rows');
     ul.replaceChildren(
       ...shown.map((p) => {
@@ -228,7 +233,7 @@ import Base from '../layouts/Base.astro';
           thumb,
           h('div', 'row-main',
             h('p', 'row-title', p.name),
-            h('p', 'row-sub', [KIND[p.kind] ?? p.kind, p.scent].filter(Boolean).join(' · ')),
+            h('p', 'row-sub', [KIND[p.kind] ?? p.kind, p.scent, p.size].filter(Boolean).join(' · ')),
           ),
           h('div', 'row-prices',
             h('span', '', `Est. ${money(p.priceStandard)}`),
@@ -286,6 +291,7 @@ import Base from '../layouts/Base.astro';
     val('p-name', p?.name ?? '');
     val('p-kind', p?.kind ?? 'mist');
     val('p-scent', p?.scent ?? '');
+    val('p-size', p?.size ?? '');
     val('p-description', p?.description ?? '');
     val('p-price-standard', p ? (p.priceStandard / 100).toFixed(2) : '');
     val('p-price-preferred', p ? (p.pricePreferred / 100).toFixed(2) : '');
@@ -312,15 +318,21 @@ import Base from '../layouts/Base.astro';
     $<HTMLDialogElement>('product-dialog').showModal();
   }
 
-  // Crop to a centered square, scale to 1200 px, encode as WebP (JPEG if the
-  // browser can't make WebP). Every product photo ends up the same shape.
+  // Fit the whole photo inside a white 1200 px square (nothing is cropped),
+  // encode as WebP (JPEG if the browser can't make WebP). Every product photo
+  // ends up the same shape, and the white blends into the catalog's backdrop.
   async function standardize(file: File): Promise<Blob> {
     const bmp = await createImageBitmap(file);
-    const side = Math.min(bmp.width, bmp.height);
-    const out = Math.min(1200, side);
+    const out = Math.min(1200, Math.max(bmp.width, bmp.height));
+    const scale = out / Math.max(bmp.width, bmp.height);
+    const w = Math.round(bmp.width * scale);
+    const hgt = Math.round(bmp.height * scale);
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = out;
-    canvas.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, out, out);
+    ctx.drawImage(bmp, (out - w) / 2, (out - hgt) / 2, w, hgt);
     const toBlob = (type: string) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.85));
     const webp = await toBlob('image/webp');
     if (webp && webp.type === 'image/webp') return webp;
@@ -361,6 +373,7 @@ import Base from '../layouts/Base.astro';
       name: get('p-name'),
       kind: get('p-kind'),
       scent: get('p-scent'),
+      size: get('p-size'),
       description: get('p-description'),
       priceStandard,
       pricePreferred,
@@ -400,7 +413,7 @@ import Base from '../layouts/Base.astro';
     $('users-status').textContent = 'Aún no hay distribuidores.';
     $('user-rows').replaceChildren(
       ...users.map((u) => {
-        // Without access the tier doesn't matter, so show only "Sin acceso".
+        // Records saved as "Sin acceso" before that option was removed still show it.
         const tier = u.role === 'admin' ? h('span', 'pill', 'Administración')
           : u.status !== 'active' ? h('span', 'pill muted', 'Sin acceso')
           : h('span', `pill ${u.tier === 'preferred' ? 'ok' : ''}`, u.tier === 'preferred' ? 'Preferente' : 'Estándar');
@@ -437,18 +450,33 @@ import Base from '../layouts/Base.astro';
     email.readOnly = !!u;
     $<HTMLInputElement>('u-name').value = u?.name ?? '';
     $<HTMLInputElement>(`u-tier-${u?.tier ?? 'standard'}`).checked = true;
-    $<HTMLInputElement>(`u-status-${u?.status ?? 'active'}`).checked = true;
-    syncAccess();
+    const del = $<HTMLButtonElement>('user-delete');
+    del.hidden = !u;
+    del.textContent = 'Eliminar';
+    delete del.dataset.armed;
     $<HTMLDialogElement>('user-dialog').showModal();
   }
 
-  // Grey out the tier while "Sin acceso" is selected.
-  function syncAccess() {
-    const removed = $<HTMLInputElement>('u-status-removed').checked;
-    $('u-tier').classList.toggle('dimmed', removed);
-    $('u-tier-note').hidden = !removed;
-  }
-  for (const id of ['u-status-active', 'u-status-removed']) $(id).addEventListener('change', syncAccess);
+  // Delete takes two taps: the first asks, the second deletes.
+  $('user-delete').addEventListener('click', async () => {
+    const del = $<HTMLButtonElement>('user-delete');
+    if (!editingUser) return;
+    if (!del.dataset.armed) {
+      del.dataset.armed = '1';
+      del.textContent = 'Sí, eliminar';
+      return;
+    }
+    del.disabled = true;
+    try {
+      await api(`/admin/users/${encodeURIComponent(editingUser.email)}`, { method: 'DELETE' });
+      $<HTMLDialogElement>('user-dialog').close();
+      await loadUsers();
+    } catch (e2) {
+      $('user-error').textContent = errorText(e2);
+    } finally {
+      del.disabled = false;
+    }
+  });
   $('user-new').addEventListener('click', () => openUser(null));
 
   $('user-form').addEventListener('submit', async (e) => {
@@ -462,7 +490,7 @@ import Base from '../layouts/Base.astro';
     try {
       await api(`/admin/users/${encodeURIComponent(email)}`, {
         method: 'PUT',
-        json: { name: f.get('name'), tier: f.get('tier'), status: f.get('status') },
+        json: { name: f.get('name'), tier: f.get('tier') },
       });
       $<HTMLDialogElement>('user-dialog').close();
       await loadUsers();

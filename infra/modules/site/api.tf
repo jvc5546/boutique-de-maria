@@ -29,7 +29,7 @@ resource "aws_iam_role" "api" {
 # media/ in the site bucket. Nothing else.
 data "aws_iam_policy_document" "api" {
   statement {
-    actions   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"]
+    actions   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:DeleteItem"]
     resources = [aws_dynamodb_table.main.arn, "${aws_dynamodb_table.main.arn}/index/*"]
   }
   statement {
@@ -119,6 +119,7 @@ resource "aws_apigatewayv2_route" "api" {
     "POST /api/admin/products/{id}/photo",
     "GET /api/admin/users",
     "PUT /api/admin/users/{email}",
+    "DELETE /api/admin/users/{email}",
     "GET /api/admin/settings",
     "PUT /api/admin/settings",
   ])

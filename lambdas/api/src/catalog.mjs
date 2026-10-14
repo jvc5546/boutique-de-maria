@@ -2,6 +2,7 @@
 //
 // Product record (table bdm-main, pk = "PRODUCT", sk = <id>):
 //   id, kind ("mist" | "lotion" | "package" | ...), name, description, scent,
+//   size (free text, e.g. "250 ml"; optional)
 //   priceStandard, pricePreferred   (integer cents, MXN)
 //   stock                           (items only; packages have none of their own)
 //   components                      (packages only: item ids inside)
@@ -47,6 +48,7 @@ export function buildCatalog(records, user, now = Date.now()) {
       name: p.name,
       description: p.description ?? '',
       scent: p.scent ?? '',
+      size: p.size ?? '',
       photo: p.photo ? `/${p.photo}` : '',
       price: priceFor(p, user),
       availability: stock <= 0 ? 'out' : stock <= LOW_STOCK ? 'low' : 'in',
