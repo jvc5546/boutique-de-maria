@@ -45,8 +45,8 @@ import Base from '../layouts/Base.astro';
     </div>
 
     <p class="status" id="status" role="status">Cargando catálogo…</p>
-    <div id="groups"></div>
     <div class="elsewhere" id="elsewhere" hidden></div>
+    <div id="groups"></div>
   </main>
 
   <dialog class="sheet" id="sheet" aria-labelledby="sheet-name">
@@ -188,10 +188,13 @@ import Base from '../layouts/Base.astro';
           .filter((x) => x.n > 0)
       : [];
     box.hidden = others.length === 0;
+    box.classList.toggle('alone', !shown.length);
     box.replaceChildren(
+      h('span', 'muted', 'También hay resultados en'),
       ...others.map(({ d, n }) => {
-        const b = h('button', 'link', `También hay ${n} ${n === 1 ? 'resultado' : 'resultados'} en ${d.name} →`) as HTMLButtonElement;
+        const b = h('button', '', `${d.name} (${n}) →`) as HTMLButtonElement;
         b.type = 'button';
+        b.setAttribute('aria-label', `Ver ${n} ${n === 1 ? 'resultado' : 'resultados'} en ${d.name}`);
         b.addEventListener('click', () => showDept(d.id));
         return b;
       }),
@@ -413,7 +416,7 @@ import Base from '../layouts/Base.astro';
       const first = data.user.name.split(' ')[0];
       if (first) $('greeting').textContent = `Hola, ${first}`;
       $('admin-link').hidden = !isAdmin;
-      showAccount(data.user.name, isAdmin ? 'Administración' : data.user.tier === 'preferred' ? 'Nivel Preferente' : 'Nivel Estándar');
+      showAccount(data.user.name, isAdmin ? 'Administración' : ''); // distributors don't see their level
       buildTabs();
       showDept(new URLSearchParams(location.search).get('seccion') ?? '', { keepScroll: true });
       const id = decodeURIComponent(location.hash.slice(1));

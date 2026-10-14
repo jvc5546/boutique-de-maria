@@ -27,7 +27,8 @@ export function makeHandler(db, clock = () => new Date()) {
       const [records, settings] = await Promise.all([db.listProducts(), db.getSettings()]);
       const products = buildCatalog(records, user, Date.parse(now), settings);
       return json(200, {
-        user: { name: user.name ?? '', role: user.role, tier: user.tier ?? '' },
+        // Distributors aren't told which level they are; only admins get it.
+        user: { name: user.name ?? '', role: user.role, ...(user.role === 'admin' ? { tier: user.tier ?? '' } : {}) },
         settings: { ordersWhatsApp: settings?.ordersWhatsApp ?? '' },
         departments: departmentsFor(products),
         products,

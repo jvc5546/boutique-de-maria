@@ -80,7 +80,7 @@ export interface Product {
 }
 
 export interface Catalog {
-  user: { name: string; role: 'admin' | 'distributor'; tier: string };
+  user: { name: string; role: 'admin' | 'distributor'; tier?: string }; // tier: admins only
   settings: { ordersWhatsApp: string };
   departments: Department[];
   products: Product[];

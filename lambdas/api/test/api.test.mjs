@@ -154,3 +154,12 @@ test('sections: products carry their section; only sections with products are li
   assert.equal(find(withTest, 't1').department, 'prueba');
   assert.equal(find(withTest, 't1').related.length, 0);
 });
+
+test('distributors are not told their level; admins are', async () => {
+  const h2 = makeHandler({ ...db, users: undefined, getUser: async (e) => (e === 'ana@example.com' ? { ...preferred, name: 'Ana' } : admin) });
+  const ana = JSON.parse((await h2(ev('GET /api/catalog', 'ana@example.com'))).body);
+  assert.equal(ana.user.tier, undefined);
+  assert.equal(ana.user.role, 'distributor');
+  const jona = JSON.parse((await h2(ev('GET /api/catalog', 'jona@example.com'))).body);
+  assert.equal(jona.user.tier, 'preferred');
+});

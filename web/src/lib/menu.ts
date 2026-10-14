@@ -29,5 +29,7 @@ export function setupAccountMenu() {
 export function showAccount(name: string, level: string) {
   document.getElementById('account-initial')!.textContent = (name || '?').trim().charAt(0).toUpperCase();
   document.getElementById('account-name')!.textContent = name;
-  document.getElementById('account-level')!.textContent = level;
+  const lv = document.getElementById('account-level')!;
+  lv.textContent = level;
+  lv.hidden = !level;
 }
